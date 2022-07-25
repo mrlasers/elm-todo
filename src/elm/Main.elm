@@ -3,7 +3,7 @@ module Main exposing (main)
 import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing ( onClick, onInput, onSubmit)
+import Html.Events exposing (onClick, onInput, onSubmit)
 import List
 import Random
 import Uuid
@@ -75,10 +75,10 @@ updateFormDescription : String -> FormData -> FormData
 updateFormDescription description form =
     { form | description = description }
 
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-
         GotNewSeed newSeed ->
             ( { model | seed = newSeed }, Cmd.none )
 
@@ -124,9 +124,9 @@ generateNewSeed : Cmd Msg
 generateNewSeed =
     Random.generate GotNewSeed Random.independentSeed
 
+
 view : Model -> Html Msg
 view model =
-
     div [ class "container" ]
         [ header []
             [ nav []
@@ -156,6 +156,9 @@ view model =
                         (List.map viewTodoItem <| model.todos)
                     ]
                 )
+            ]
+        ]
+
 
 viewTodoItem : Todo -> Html msg
 viewTodoItem { title, id, description } =
@@ -188,7 +191,7 @@ init { seed } =
 main : Program Flags Model Msg
 main =
     Browser.element
-        { init = \flags -> ( initialModel, Cmd.none )
+        { init = init
         , view = view
         , update = update
         , subscriptions = \model -> Sub.none

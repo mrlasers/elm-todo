@@ -1,18 +1,3 @@
-<<<<<<< HEAD
-body {
-  box-sizing: border-box;
-}
-
-body *,
-*::before,
-*::after {
-  box-sizing: inherit;
-}
-
-body {
-  background-color: papayawhip;
-}
-=======
 @use './reset.scss';
 
 :root {
@@ -114,4 +99,3 @@ form {
     font-size: 60%;
   }
 }
->>>>>>> d94ca4a (major functionality seems to be in place)
