@@ -11,9 +11,14 @@
 #.pnp.*
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 dist
 elm-stuff/
 repl-temp-*
 =======
 dist
 >>>>>>> d94ca4a (major functionality seems to be in place)
+=======
+dist
+elm-stuff
+>>>>>>> aa251c7 (update gitignore)

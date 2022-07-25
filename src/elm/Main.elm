@@ -74,8 +74,6 @@ updateFormTitle title form =
 updateFormDescription : String -> FormData -> FormData
 updateFormDescription description form =
     { form | description = description }
->>>>>>> d94ca4a (major functionality seems to be in place)
-
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -188,7 +186,6 @@ init { seed } =
 
 
 main : Program Flags Model Msg
->>>>>>> d94ca4a (major functionality seems to be in place)
 main =
     Browser.element
         { init = \flags -> ( initialModel, Cmd.none )
