@@ -3,7 +3,7 @@ module Main exposing (main)
 import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onCheck, onClick, onInput, onSubmit)
+import Html.Events exposing ( onClick, onInput, onSubmit)
 import List
 import Random
 import Uuid
