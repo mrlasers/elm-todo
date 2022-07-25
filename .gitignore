@@ -11,4 +11,5 @@
 #.pnp.*
 
 dist
-elm-stuff
+elm-stuff/
+repl-temp-*
