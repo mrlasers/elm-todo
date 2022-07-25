@@ -38,12 +38,14 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["elm-webpack-loader", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:8.0.0"],\
             ["extract-text-webpack-plugin", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:3.0.2"],\
             ["html-webpack-plugin", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:5.5.0"],\
+            ["mini-css-extract-plugin", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:2.6.1"],\
             ["sass", "npm:1.54.0"],\
             ["sass-loader", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:13.0.2"],\
             ["style-loader", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:3.3.1"],\
             ["webpack", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:5.73.0"],\
             ["webpack-cli", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:4.10.0"],\
-            ["webpack-dev-server", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:4.9.3"]\
+            ["webpack-dev-server", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:4.9.3"],\
+            ["webpack-merge", "npm:5.8.0"]\
           ],\
           "linkType": "SOFT"\
         }]\
@@ -3045,6 +3047,29 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
           "linkType": "HARD"\
         }]\
       ]],\
+      ["mini-css-extract-plugin", [\
+        ["npm:2.6.1", {\
+          "packageLocation": "./.yarn/cache/mini-css-extract-plugin-npm-2.6.1-4e6d2beaf0-df60840404.zip/node_modules/mini-css-extract-plugin/",\
+          "packageDependencies": [\
+            ["mini-css-extract-plugin", "npm:2.6.1"]\
+          ],\
+          "linkType": "SOFT"\
+        }],\
+        ["virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:2.6.1", {\
+          "packageLocation": "./.yarn/__virtual__/mini-css-extract-plugin-virtual-c3d87bc4f7/0/cache/mini-css-extract-plugin-npm-2.6.1-4e6d2beaf0-df60840404.zip/node_modules/mini-css-extract-plugin/",\
+          "packageDependencies": [\
+            ["mini-css-extract-plugin", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:2.6.1"],\
+            ["@types/webpack", null],\
+            ["schema-utils", "npm:4.0.0"],\
+            ["webpack", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:5.73.0"]\
+          ],\
+          "packagePeers": [\
+            "@types/webpack",\
+            "webpack"\
+          ],\
+          "linkType": "HARD"\
+        }]\
+      ]],\
       ["minimalistic-assert", [\
         ["npm:1.0.1", {\
           "packageLocation": "./.yarn/cache/minimalistic-assert-npm-1.0.1-dc8bb23d29-cc7974a926.zip/node_modules/minimalistic-assert/",\
@@ -3182,12 +3207,14 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["elm-webpack-loader", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:8.0.0"],\
             ["extract-text-webpack-plugin", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:3.0.2"],\
             ["html-webpack-plugin", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:5.5.0"],\
+            ["mini-css-extract-plugin", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:2.6.1"],\
             ["sass", "npm:1.54.0"],\
             ["sass-loader", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:13.0.2"],\
             ["style-loader", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:3.3.1"],\
             ["webpack", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:5.73.0"],\
             ["webpack-cli", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:4.10.0"],\
-            ["webpack-dev-server", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:4.9.3"]\
+            ["webpack-dev-server", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:4.9.3"],\
+            ["webpack-merge", "npm:5.8.0"]\
           ],\
           "linkType": "SOFT"\
         }]\
