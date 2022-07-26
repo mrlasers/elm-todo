@@ -53,8 +53,20 @@ form {
   label {
     display: flex;
     flex-direction: column;
+    justify-content: stretch;
+    align-items: stretch;
+
+    & * {
+      outline: 4px blue;
+    }
   }
 }
+
+// input {
+//   background-color: red;
+//   padding: 50px;
+//   margin: 10px;
+// }
 
 .todo-list {
   padding: 1rem 0;

@@ -39,6 +39,7 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["extract-text-webpack-plugin", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:3.0.2"],\
             ["html-webpack-plugin", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:5.5.0"],\
             ["mini-css-extract-plugin", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:2.6.1"],\
+            ["nanoid", "npm:4.0.0"],\
             ["sass", "npm:1.54.0"],\
             ["sass-loader", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:13.0.2"],\
             ["style-loader", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:3.3.1"],\
@@ -3208,6 +3209,7 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["extract-text-webpack-plugin", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:3.0.2"],\
             ["html-webpack-plugin", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:5.5.0"],\
             ["mini-css-extract-plugin", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:2.6.1"],\
+            ["nanoid", "npm:4.0.0"],\
             ["sass", "npm:1.54.0"],\
             ["sass-loader", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:13.0.2"],\
             ["style-loader", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:3.3.1"],\
@@ -3258,6 +3260,13 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
           "packageLocation": "./.yarn/cache/nanoid-npm-3.3.4-3d250377d6-2fddd6dee9.zip/node_modules/nanoid/",\
           "packageDependencies": [\
             ["nanoid", "npm:3.3.4"]\
+          ],\
+          "linkType": "HARD"\
+        }],\
+        ["npm:4.0.0", {\
+          "packageLocation": "./.yarn/cache/nanoid-npm-4.0.0-924f5c6312-7d5946df5c.zip/node_modules/nanoid/",\
+          "packageDependencies": [\
+            ["nanoid", "npm:4.0.0"]\
           ],\
           "linkType": "HARD"\
         }]\
