@@ -23,24 +23,37 @@ const flags = { seed: getRandomInts(5)[0] }
 
 const app = Elm.Main.init({ node: document.getElementById('app'), flags })
 
-app.ports.sendMessage.subscribe(function (action) {
-  console.log('ports.sendMessage:', action)
-  switch (action.type) {
-    default:
-      console.log('Unhandled message from Elm:', action)
-    case 'focus': {
-      const el = document.getElementById(action.payload)
-      if (el) el.select()
-      return
-    }
-    case 'getid': {
-      const id = nanoid()
+app.ports.messageReceiver.send(
+  JSON.stringify({
+    type: 'hello',
+    payload: 'howdy doody',
+  })
+)
 
-      console.log(`Sending id "${id}" to Elm...`)
+console.log(app.ports)
 
-      app.ports.messageReceiver.send(
-        JSON.stringify({ name: 'getid', payload: id })
-      )
-    }
-  }
+app.ports.sendMessage.subscribe(function (message) {
+  console.log('Received message from `app.ports.sendMessage`: ', message)
 })
+
+// app.ports.sendMessage.subscribe(function (action) {
+//   console.log('ports.sendMessage:', action)
+//   switch (action.type) {
+//     default:
+//       console.log('Unhandled message from Elm:', action)
+//     case 'focus': {
+//       const el = document.getElementById(action.payload)
+//       if (el) el.select()
+//       return
+//     }
+//     case 'getid': {
+//       const id = nanoid()
+
+//       console.log(`Sending id "${id}" to Elm...`)
+
+//       app.ports.messageReceiver.send(
+//         JSON.stringify({ name: 'getid', payload: id })
+//       )
+//     }
+//   }
+// })

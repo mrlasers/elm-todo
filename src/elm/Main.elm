@@ -1,5 +1,6 @@
 port module Main exposing (main)
 
+import Array as A
 import Browser exposing (Document)
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -35,7 +36,7 @@ type SendMessage
     | SendString String String
 
 
-port sendMessage : E.Value -> Cmd msg
+port sendMessage : String -> Cmd msg
 
 
 sendEncodedMessage : SendMessage -> E.Value
@@ -54,10 +55,6 @@ sendEncodedMessage action =
 port messageReceiver : (String -> msg) -> Sub msg
 
 
-type PortMessage
-    = FocusInputById String
-
-
 encodeMessage : PortMessage -> E.Value
 encodeMessage msg =
     case msg of
@@ -65,18 +62,84 @@ encodeMessage msg =
             E.object [ ( "type", E.string "focusElement" ), ( "payload", E.string id ) ]
 
 
-type alias RecvAction =
-    { name : String
+type PortMessage
+    = FocusInputById String
+
+
+type ReceivedPortMessage
+    = PortString String
+    | UnhandledPortMessage String
+    | SomethingFun String
+
+
+type alias RecvMessage =
+    { type_ : String
     , payload : String
     }
 
 
-recvDecoder : D.Decoder RecvAction
-recvDecoder =
-    D.map2 RecvAction (D.field "name" D.string) (D.field "payload" D.string)
+decoderRecv : D.Decoder RecvMessage
+decoderRecv =
+    D.map2 RecvMessage (D.field "type" D.string) (D.field "payload" D.string)
+
+
+decodeReceivedMessage : String -> ReceivedPortMessage
+decodeReceivedMessage incoming =
+    D.decodeString decoderRecv incoming
+        |> (\result ->
+                case result of
+                    Ok message ->
+                        decodeReceivedPayload message
+
+                    Err error ->
+                        UnhandledPortMessage (D.errorToString error)
+           )
+
+
+decodeReceivedPayload : RecvMessage -> ReceivedPortMessage
+decodeReceivedPayload message =
+    let
+        { type_, payload } =
+            message
+    in
+    case type_ of
+        "something-fun" ->
+            SomethingFun payload
+
+        _ ->
+            UnhandledPortMessage
+                ("Unknown message: { type: \""
+                    ++ type_
+                    ++ "\", "
+                    ++ "payload: \""
+                    ++ payload
+                    ++ "\" }"
+                    ++ "\n\n"
+                    ++ "We should really handle this type of message at some point..."
+                )
 
 
 
+-- type alias MessagePayloadDecoder =
+--     { type_ : String
+--     , payload : String
+--     }
+-- handleReceivedMessage : String -> Msg
+-- handleReceivedMessage message =
+--     recvDecoder message
+--         |> (\received ->
+--                 case received.type_ of
+--                     "jsmessage" ->
+--                         UpdateJsMessage "got a jsmessage"
+--                     _ ->
+--                         Noop
+--            )
+-- D.map2 RecvAction (D.field "type_" D.string) (D.field "payload" D.string)
+--     |> (\action ->
+--             case action.type_ of
+--                 _ ->
+--                     Noop
+--        )
 -- MODEL
 
 
@@ -85,6 +148,7 @@ type alias Model =
     , todos : List Todo
     , displayStyle : ListStyle
     , form : FormData
+    , jsMessage : String
     }
 
 
@@ -121,21 +185,24 @@ newUuid seed =
 
 
 type Msg
-    = GotNewSeed Random.Seed
+    = Noop
+    | GotNewSeed Random.Seed
     | AddTodo
     | NewFormTitle String
     | NewFormDescription String
     | SetDisplayType ListStyle
     | ResetForm
     | DeleteAllTodos
-    | Send E.Value
     | Recv String
-    | FocusInput String
+    | UpdateJsMessage String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        Noop ->
+            ( model, Cmd.none )
+
         GotNewSeed newSeed ->
             ( { model | seed = newSeed }, Cmd.none )
 
@@ -159,7 +226,7 @@ update msg model =
 
             else
                 let
-                    ( id, seed ) =
+                    ( id, _ ) =
                         newUuid model.seed
 
                     { todos } =
@@ -176,31 +243,24 @@ update msg model =
         DeleteAllTodos ->
             ( { model | todos = [] }, Cmd.none )
 
-        Send encodedMessage ->
-            ( model
-            , sendMessage encodedMessage
-            )
+        UpdateJsMessage text ->
+            ( { model | jsMessage = text }, sendMessage "Updated jsMessage..." )
 
-        Recv _ ->
-            ( model, Cmd.none )
+        Recv message ->
+            case decodeReceivedMessage message of
+                PortString text ->
+                    update (UpdateJsMessage text) model
 
-        FocusInput id ->
-            ( model, FocusInputById id |> encodeMessage |> sendMessage )
+                SomethingFun funtext ->
+                    update (UpdateJsMessage funtext) model
 
-
-
--- SUBSCRIPTIONS
--- subscriptions : Model -> Sub Msg
+                UnhandledPortMessage error ->
+                    update (UpdateJsMessage error) model
 
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
     messageReceiver Recv
-
-
-
--- VIEW
--- FORM HELPER FUNCTIONS
 
 
 emptyForm : FormData
@@ -236,6 +296,9 @@ view model =
                 , text " | "
                 , button [ onClick DeleteAllTodos ] [ text "Delete All" ]
                 , text " | "
+                , button [ onClick (Recv "{ \"type\": \"something-fun\", \"payload\": \"Hello, World!\"}") ] [ text "Recv Success" ]
+                , button [ onClick (Recv "{ \"type\": \"important message\", \"payload\": \"very importnat meassage!\"}") ] [ text "Recv Unhandled" ]
+                , button [ onClick (Recv "{ type\":d \"something-fun\", \"payload\": \"Hello, World!\"}") ] [ text "Recv Error" ]
 
                 -- , button [ onClick (Send (SendText "buttholes")) ] [ text "Send to Port" ]
                 , text " | "
@@ -247,7 +310,7 @@ view model =
             [ Html.form [ onSubmit AddTodo ]
                 [ label []
                     [ span [] [ text "Title" ]
-                    , input [ id "task-title", placeholder "Todo title", value model.form.title, onClick (FocusInput "task-title") ] []
+                    , input [ id "task-title", placeholder "Todo0 title", onInput NewFormTitle, value model.form.title, onClick Noop ] []
                     ]
                 , label []
                     [ span [] [ text "Description" ]
@@ -266,6 +329,16 @@ view model =
                         (List.map viewTodoItem <| model.todos)
                     ]
                 )
+            ]
+        , footer []
+            [ div [ class "debug" ]
+                [ div []
+                    (model.jsMessage
+                        |> String.split "\n"
+                        |> List.filter (not << String.isEmpty)
+                        |> List.map (\line -> p [] [ text line ])
+                    )
+                ]
             ]
         ]
     }
@@ -286,7 +359,14 @@ type alias Flags =
 
 init : Flags -> ( Model, Cmd Msg )
 init { seed } =
-    ( { seed = Random.initialSeed seed, todos = [], form = { title = "", description = "" }, displayStyle = TodoList }, generateNewSeed )
+    ( { seed = Random.initialSeed seed
+      , todos = []
+      , form = { title = "", description = "" }
+      , jsMessage = "[ hello world ]"
+      , displayStyle = TodoList
+      }
+    , generateNewSeed
+    )
 
 
 autoSelectInput : List (Attribute msg) -> List () -> Html msg
