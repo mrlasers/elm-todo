@@ -1,6 +1,5 @@
 port module Main exposing (main)
 
-import Array as A
 import Browser exposing (Document)
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -30,26 +29,7 @@ main =
 -- PORTS
 
 
-type SendMessage
-    = SendText String
-    | GetNewId
-    | SendString String String
-
-
 port messageFromElm : E.Value -> Cmd msg
-
-
-sendEncodedMessage : SendMessage -> E.Value
-sendEncodedMessage message =
-    case message of
-        SendText text ->
-            E.object [ ( "text", E.string text ) ]
-
-        GetNewId ->
-            E.object [ ( "type", E.string "getid" ), ( "payload", E.null ) ]
-
-        SendString type_ text ->
-            E.object [ ( "type", E.string type_ ), ( "text", E.string text ) ]
 
 
 port messageReceiver : (String -> msg) -> Sub msg
@@ -124,26 +104,6 @@ decodeReceivedPayload message =
 
 
 
--- type alias MessagePayloadDecoder =
---     { type_ : String
---     , payload : String
---     }
--- handleReceivedMessage : String -> Msg
--- handleReceivedMessage message =
---     recvDecoder message
---         |> (\received ->
---                 case received.type_ of
---                     "jsmessage" ->
---                         UpdateJsMessage "got a jsmessage"
---                     _ ->
---                         Noop
---            )
--- D.map2 RecvAction (D.field "type_" D.string) (D.field "payload" D.string)
---     |> (\action ->
---             case action.type_ of
---                 _ ->
---                     Noop
---        )
 -- MODEL
 
 
@@ -251,7 +211,7 @@ update msg model =
                 ( { model | todos = todos, form = emptyForm }, messageFromElm (encodeMessage (SaveTodosList todos)) )
 
         DeleteAllTodos ->
-            ( { model | todos = [] }, Cmd.none )
+            ( { model | todos = [] }, messageFromElm (encodeMessage (SaveTodosList [])) )
 
         UpdateJsMessage text ->
             ( { model | jsMessage = text }, messageFromElm (E.string "Updated jsMessage...") )
@@ -385,9 +345,3 @@ init { seed, todos } =
       }
     , generateNewSeed
     )
-
-
-autoSelectInput : List (Attribute msg) -> List () -> Html msg
-autoSelectInput attributes _ =
-    -- input (attribute "is" "best-text" :: attributes) []
-    node "select-input" attributes []
