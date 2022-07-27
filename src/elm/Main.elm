@@ -61,9 +61,13 @@ encodeMessage msg =
         FocusInputById id ->
             E.object [ ( "type", E.string "focus-element" ), ( "payload", E.string id ) ]
 
+        SaveTodosList todos ->
+            E.object [ ( "type", E.string "save-todos" ), ( "payload", E.list encodeTodo todos ) ]
+
 
 type SendPortMessage
     = FocusInputById String
+    | SaveTodosList (List Todo)
 
 
 type ReceivePortMessage
@@ -156,6 +160,15 @@ type alias Todo =
     { id : String, title : String, description : String }
 
 
+encodeTodo : Todo -> E.Value
+encodeTodo todo =
+    E.object
+        [ ( "id", E.string todo.id )
+        , ( "title", E.string todo.title )
+        , ( "description", E.string todo.description )
+        ]
+
+
 type alias FormData =
     { title : String, description : String }
 
@@ -191,7 +204,6 @@ type Msg
     | NewFormTitle String
     | NewFormDescription String
     | SetDisplayType ListStyle
-    | ResetForm
     | DeleteAllTodos
     | Recv String
     | UpdateJsMessage String
@@ -230,16 +242,13 @@ update msg model =
                     ( id, _ ) =
                         newUuid model.seed
 
-                    { todos } =
-                        model
-
                     { title, description } =
                         model.form
-                in
-                update ResetForm { model | todos = todos ++ [ { id = id, title = title, description = description } ] }
 
-        ResetForm ->
-            ( { model | form = emptyForm }, generateNewSeed )
+                    todos =
+                        model.todos ++ [ { id = id, title = title, description = description } ]
+                in
+                ( { model | todos = todos, form = emptyForm }, messageFromElm (encodeMessage (SaveTodosList todos)) )
 
         DeleteAllTodos ->
             ( { model | todos = [] }, Cmd.none )
@@ -250,18 +259,16 @@ update msg model =
         Recv message ->
             case decodeReceivedMessage message of
                 PortString text ->
-                    update (UpdateJsMessage text) model
+                    ( { model | jsMessage = text }, Cmd.none )
 
-                SomethingFun funtext ->
-                    update (UpdateJsMessage funtext) model
+                SomethingFun text ->
+                    ( { model | jsMessage = text }, Cmd.none )
 
-                UnhandledPortMessage error ->
-                    update (UpdateJsMessage error) model
+                UnhandledPortMessage text ->
+                    ( { model | jsMessage = text }, Cmd.none )
 
         Send message ->
-            case message of
-                FocusInputById id ->
-                    ( model, messageFromElm (encodeMessage (FocusInputById id)) )
+            ( model, messageFromElm (encodeMessage message) )
 
 
 subscriptions : Model -> Sub Msg
@@ -325,7 +332,7 @@ view model =
                     ]
                 , label []
                     [ span [] [ text "Description" ]
-                    , textarea [ placeholder "Todo description/notes" ] []
+                    , textarea [ placeholder "Todo description/notes", onInput NewFormDescription, value model.form.description ] []
 
                     -- , viewInput "task-desc" "textarea" "Todo description/notes" model.form.description NewFormDescription
                     ]
