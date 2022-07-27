@@ -36,12 +36,12 @@ type SendMessage
     | SendString String String
 
 
-port sendMessage : String -> Cmd msg
+port messageFromElm : E.Value -> Cmd msg
 
 
 sendEncodedMessage : SendMessage -> E.Value
-sendEncodedMessage action =
-    case action of
+sendEncodedMessage message =
+    case message of
         SendText text ->
             E.object [ ( "text", E.string text ) ]
 
@@ -55,18 +55,18 @@ sendEncodedMessage action =
 port messageReceiver : (String -> msg) -> Sub msg
 
 
-encodeMessage : PortMessage -> E.Value
+encodeMessage : SendPortMessage -> E.Value
 encodeMessage msg =
     case msg of
         FocusInputById id ->
-            E.object [ ( "type", E.string "focusElement" ), ( "payload", E.string id ) ]
+            E.object [ ( "type", E.string "focus-element" ), ( "payload", E.string id ) ]
 
 
-type PortMessage
+type SendPortMessage
     = FocusInputById String
 
 
-type ReceivedPortMessage
+type ReceivePortMessage
     = PortString String
     | UnhandledPortMessage String
     | SomethingFun String
@@ -83,7 +83,7 @@ decoderRecv =
     D.map2 RecvMessage (D.field "type" D.string) (D.field "payload" D.string)
 
 
-decodeReceivedMessage : String -> ReceivedPortMessage
+decodeReceivedMessage : String -> ReceivePortMessage
 decodeReceivedMessage incoming =
     D.decodeString decoderRecv incoming
         |> (\result ->
@@ -96,7 +96,7 @@ decodeReceivedMessage incoming =
            )
 
 
-decodeReceivedPayload : RecvMessage -> ReceivedPortMessage
+decodeReceivedPayload : RecvMessage -> ReceivePortMessage
 decodeReceivedPayload message =
     let
         { type_, payload } =
@@ -195,6 +195,7 @@ type Msg
     | DeleteAllTodos
     | Recv String
     | UpdateJsMessage String
+    | Send SendPortMessage
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -244,7 +245,7 @@ update msg model =
             ( { model | todos = [] }, Cmd.none )
 
         UpdateJsMessage text ->
-            ( { model | jsMessage = text }, sendMessage "Updated jsMessage..." )
+            ( { model | jsMessage = text }, messageFromElm (E.string "Updated jsMessage...") )
 
         Recv message ->
             case decodeReceivedMessage message of
@@ -256,6 +257,11 @@ update msg model =
 
                 UnhandledPortMessage error ->
                     update (UpdateJsMessage error) model
+
+        Send message ->
+            case message of
+                FocusInputById id ->
+                    ( model, messageFromElm (encodeMessage (FocusInputById id)) )
 
 
 subscriptions : Model -> Sub Msg
@@ -285,6 +291,11 @@ generateNewSeed =
     Random.generate GotNewSeed Random.independentSeed
 
 
+onClickToFocus : String -> Attribute Msg
+onClickToFocus =
+    onClick << Send << FocusInputById
+
+
 view : Model -> Document Msg
 view model =
     { title = "Tasks.TimothyPew_com"
@@ -310,7 +321,7 @@ view model =
             [ Html.form [ onSubmit AddTodo ]
                 [ label []
                     [ span [] [ text "Title" ]
-                    , input [ id "task-title", placeholder "Todo0 title", onInput NewFormTitle, value model.form.title, onClick Noop ] []
+                    , input [ id "task-title", placeholder "Todo0 title", onInput NewFormTitle, value model.form.title, onClickToFocus "task-title" ] []
                     ]
                 , label []
                     [ span [] [ text "Description" ]
