@@ -130,7 +130,10 @@ encodeTodo todo =
 
 
 type alias FormData =
-    { title : String, description : String }
+    { id : String
+    , title : String
+    , description : String
+    }
 
 
 type ListStyle
@@ -148,9 +151,9 @@ listStyleToClass style =
             "list"
 
 
-newUuid : Random.Seed -> ( String, Random.Seed )
-newUuid seed =
-    seed |> Random.step Uuid.uuidGenerator |> Tuple.mapFirst Uuid.toString
+makeUuid : Random.Seed -> String
+makeUuid seed =
+    seed |> Random.step Uuid.uuidGenerator |> Tuple.mapFirst Uuid.toString |> Tuple.first
 
 
 
@@ -164,6 +167,7 @@ type Msg
     | NewFormTitle String
     | NewFormDescription String
     | SetDisplayType ListStyle
+    | DeleteTodo String
     | DeleteAllTodos
     | Recv String
     | UpdateJsMessage String
@@ -199,16 +203,19 @@ update msg model =
 
             else
                 let
-                    ( id, _ ) =
-                        newUuid model.seed
-
-                    { title, description } =
-                        model.form
-
                     todos =
-                        model.todos ++ [ { id = id, title = title, description = description } ]
+                        model.todos ++ [ model.form ]
                 in
-                ( { model | todos = todos, form = emptyForm }, messageFromElm (encodeMessage (SaveTodosList todos)) )
+                ( { model | todos = todos, form = makeNewForm model.seed }
+                , Cmd.batch [ messageFromElm (encodeMessage (SaveTodosList todos)), generateNewSeed ]
+                )
+
+        DeleteTodo id ->
+            let
+                todos =
+                    List.filter (\td -> td.id /= id) model.todos
+            in
+            ( { model | todos = todos }, messageFromElm (encodeMessage (SaveTodosList todos)) )
 
         DeleteAllTodos ->
             ( { model | todos = [] }, messageFromElm (encodeMessage (SaveTodosList [])) )
@@ -236,9 +243,10 @@ subscriptions _ =
     messageReceiver Recv
 
 
-emptyForm : FormData
-emptyForm =
-    { title = ""
+makeNewForm : Random.Seed -> FormData
+makeNewForm seed =
+    { id = makeUuid seed
+    , title = ""
     , description = ""
     }
 
@@ -322,12 +330,13 @@ view model =
     }
 
 
-viewTodoItem : Todo -> Html msg
+viewTodoItem : Todo -> Html Msg
 viewTodoItem { title, id, description } =
     li [ class "todo-item" ]
         [ h3 [] [ text title ]
         , p [] [ text description ]
         , div [ class "id" ] [ text id ]
+        , span [ class "delete", onClick (DeleteTodo id) ] [ text "❌" ]
         ]
 
 
@@ -337,9 +346,13 @@ type alias Flags =
 
 init : Flags -> ( Model, Cmd Msg )
 init { seed, todos } =
-    ( { seed = Random.initialSeed seed
+    let
+        newSeed =
+            Random.initialSeed seed
+    in
+    ( { seed = newSeed
       , todos = todos
-      , form = { title = "", description = "" }
+      , form = makeNewForm newSeed
       , jsMessage = "[ hello world ]"
       , displayStyle = TodoList
       }
