@@ -372,13 +372,13 @@ viewTodoItem { title, id, description } =
 
 
 type alias Flags =
-    { seed : Int }
+    { seed : Int, todos : List Todo }
 
 
 init : Flags -> ( Model, Cmd Msg )
-init { seed } =
+init { seed, todos } =
     ( { seed = Random.initialSeed seed
-      , todos = []
+      , todos = todos
       , form = { title = "", description = "" }
       , jsMessage = "[ hello world ]"
       , displayStyle = TodoList

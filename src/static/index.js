@@ -19,7 +19,10 @@ const getRandomInts = (n) => {
   return Array.from(randInts)
 }
 
-const flags = { seed: getRandomInts(5)[0] }
+const flags = {
+  seed: getRandomInts(5)[0],
+  todos: JSON.parse(localStorage.getItem('todos')),
+}
 
 const app = Elm.Main.init({ node: document.getElementById('app'), flags })
 
