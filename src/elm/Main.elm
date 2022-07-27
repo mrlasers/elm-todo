@@ -3,7 +3,7 @@ port module Main exposing (main)
 import Browser exposing (Document)
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick, onInput, onSubmit)
+import Html.Events exposing (on, onClick, onInput, onSubmit)
 import Json.Decode as D
 import Json.Encode as E
 import List
@@ -29,29 +29,40 @@ main =
 -- PORTS
 
 
-type SendAction
-    = FocusInput String
-    | SendText String
+type SendMessage
+    = SendText String
     | GetNewId
+    | SendString String String
 
 
 port sendMessage : E.Value -> Cmd msg
 
 
-sendEncoder : SendAction -> E.Value
-sendEncoder action =
+sendEncodedMessage : SendMessage -> E.Value
+sendEncodedMessage action =
     case action of
-        FocusInput id ->
-            E.object [ ( "type", E.string "focus" ), ( "payload", E.string id ) ]
-
         SendText text ->
             E.object [ ( "text", E.string text ) ]
 
         GetNewId ->
             E.object [ ( "type", E.string "getid" ), ( "payload", E.null ) ]
 
+        SendString type_ text ->
+            E.object [ ( "type", E.string type_ ), ( "text", E.string text ) ]
+
 
 port messageReceiver : (String -> msg) -> Sub msg
+
+
+type PortMessage
+    = FocusInputById String
+
+
+encodeMessage : PortMessage -> E.Value
+encodeMessage msg =
+    case msg of
+        FocusInputById id ->
+            E.object [ ( "type", E.string "focusElement" ), ( "payload", E.string id ) ]
 
 
 type alias RecvAction =
@@ -117,8 +128,9 @@ type Msg
     | SetDisplayType ListStyle
     | ResetForm
     | DeleteAllTodos
-    | Send SendAction
+    | Send E.Value
     | Recv String
+    | FocusInput String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -164,13 +176,16 @@ update msg model =
         DeleteAllTodos ->
             ( { model | todos = [] }, Cmd.none )
 
-        Send action ->
+        Send encodedMessage ->
             ( model
-            , sendEncoder action |> sendMessage
+            , sendMessage encodedMessage
             )
 
         Recv _ ->
             ( model, Cmd.none )
+
+        FocusInput id ->
+            ( model, FocusInputById id |> encodeMessage |> sendMessage )
 
 
 
@@ -212,7 +227,7 @@ generateNewSeed =
 
 view : Model -> Document Msg
 view model =
-    { title = "Buttholes"
+    { title = "Tasks.TimothyPew_com"
     , body =
         [ header []
             [ nav []
@@ -221,23 +236,24 @@ view model =
                 , text " | "
                 , button [ onClick DeleteAllTodos ] [ text "Delete All" ]
                 , text " | "
-                , button [ onClick (Send (SendText "buttholes")) ] [ text "Send to Port" ]
+
+                -- , button [ onClick (Send (SendText "buttholes")) ] [ text "Send to Port" ]
                 , text " | "
-                , input [ id "click-test", placeholder "click test", value "bullhotes", onClick (Send (FocusInput "click-test")) ] []
-                , text " | "
-                , button [ onClick (Send GetNewId) ] [ text "Get new ID" ]
+
+                -- , button [ onClick (Send GetNewId) ] [ text "Get new ID" ]
                 ]
             ]
         , main_ []
             [ Html.form [ onSubmit AddTodo ]
                 [ label []
                     [ span [] [ text "Title" ]
-                    , viewInput "task-title" "text" "Todo title" model.form.title NewFormTitle
-                    , input [ placeholder "Todo title", value model.form.title ] []
+                    , input [ id "task-title", placeholder "Todo title", value model.form.title, onClick (FocusInput "task-title") ] []
                     ]
                 , label []
                     [ span [] [ text "Description" ]
-                    , viewInput "task-desc" "textarea" "Todo description/notes" model.form.description NewFormDescription
+                    , textarea [ placeholder "Todo description/notes" ] []
+
+                    -- , viewInput "task-desc" "textarea" "Todo description/notes" model.form.description NewFormDescription
                     ]
                 , input [ type_ "submit", value "Add" ] []
                 ]
@@ -251,17 +267,6 @@ view model =
                     ]
                 )
             ]
-        , autoSelectInput
-            [ placeholder
-                (if String.isEmpty model.form.description then
-                    "BOOPYDOOP"
-
-                 else
-                    model.form.description
-                )
-            , value model.form.title
-            ]
-            []
         ]
     }
 
@@ -273,16 +278,6 @@ viewTodoItem { title, id, description } =
         , p [] [ text description ]
         , div [ class "id" ] [ text id ]
         ]
-
-
-viewInput : String -> String -> String -> String -> (String -> msg) -> Html msg
-viewInput i t p v toMsg =
-    case t of
-        "textarea" ->
-            textarea [ id i, placeholder p, value v, onInput toMsg ] []
-
-        _ ->
-            input [ placeholder p, value v, onInput toMsg ] []
 
 
 type alias Flags =
