@@ -4,10 +4,12 @@ import Browser exposing (Document)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (on, onClick, onInput, onSubmit)
+import Iso8601
 import Json.Decode as D
 import Json.Encode as E
 import List
 import Random
+import Time
 import Uuid
 
 
@@ -104,6 +106,12 @@ decodeReceivedPayload message =
 
 
 
+-- / json decoders
+-- todoDecoder : D.Decoder SerializableTodo
+-- todoDecoder =
+--     D.map3 Todo (D.field "id" D.string) (D.field "title" D.string) (D.field "description" D.string)
+-- timeDecoder time =
+--     Time.millisToPosix time
 -- MODEL
 
 
@@ -113,17 +121,68 @@ type alias Model =
     , displayStyle : ListStyle
     , form : FormData
     , jsMessage : String
+    , time :
+        { now : Time.Posix
+        , zone : Time.Zone
+        }
+    }
+
+
+type alias SerializableTodo =
+    { id : String
+    , createdAt : Maybe Int
+    , title : String
+    , description : String
     }
 
 
 type alias Todo =
-    { id : String, title : String, description : String }
+    { id : String
+    , createdAt : Time.Posix
+    , title : String
+    , description : String
+    }
+
+
+
+-- should this be Maybe Todo?
+
+
+decodeTodo : D.Decoder Todo
+decodeTodo =
+    D.map4 Todo
+        (D.field "id" D.string)
+        (D.field "createdAt" D.int
+            |> D.andThen
+                (\time ->
+                    case time of
+                        _ ->
+                            D.succeed (Time.millisToPosix 0)
+                )
+        )
+        (D.field "title" D.string)
+        (D.field "description" D.string)
+
+
+
+-- decodeTodo value =
+--     { id = "123"
+--     , createdAt =
+--         case value.createdAt of
+--             Just time ->
+--                 Time.millisToPosix time
+--             Nothing ->
+--                 Time.millisToPosix 0
+--     , title = "abc"
+--     , description = "Nothing to see here"
+--     }
 
 
 encodeTodo : Todo -> E.Value
 encodeTodo todo =
     E.object
         [ ( "id", E.string todo.id )
+        , ( "createdAt", E.int (Time.posixToMillis todo.createdAt) )
         , ( "title", E.string todo.title )
         , ( "description", E.string todo.description )
         ]
@@ -131,6 +190,8 @@ encodeTodo todo =
 
 type alias FormData =
     { id : String
+
+    -- , createdAt : Time.Posix
     , title : String
     , description : String
     }
@@ -156,6 +217,24 @@ makeUuid seed =
     seed |> Random.step Uuid.uuidGenerator |> Tuple.mapFirst Uuid.toString |> Tuple.first
 
 
+makeFormattedTimeString : Time.Posix -> String
+makeFormattedTimeString time =
+    String.fromInt (Time.toHour Time.utc time)
+        ++ ":"
+        ++ (String.padLeft 2 '0' <| String.fromInt (Time.toMinute Time.utc time))
+        ++ ":"
+        ++ (String.padLeft 2 '0' <| String.fromInt (Time.toSecond Time.utc time))
+
+
+
+-- 2022-07-26T18:44:37Z
+
+
+makeUTCZuluTimeString : Time.Posix -> String
+makeUTCZuluTimeString time =
+    Iso8601.fromTime time
+
+
 
 -- UPDATE
 
@@ -172,6 +251,7 @@ type Msg
     | Recv String
     | UpdateJsMessage String
     | Send SendPortMessage
+    | Tick Time.Posix
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -179,6 +259,24 @@ update msg model =
     case msg of
         Noop ->
             ( model, Cmd.none )
+
+        Tick newTime ->
+            let
+                time =
+                    model.time
+
+                form =
+                    model.form
+
+                nextTime =
+                    { time | now = newTime }
+
+                nextForm =
+                    model.form
+
+                -- { form | createdAt = newTime }
+            in
+            ( { model | time = nextTime, form = nextForm }, Cmd.none )
 
         GotNewSeed newSeed ->
             ( { model | seed = newSeed }, Cmd.none )
@@ -203,10 +301,19 @@ update msg model =
 
             else
                 let
+                    { id, title, description } =
+                        model.form
+
                     todos =
-                        model.todos ++ [ model.form ]
+                        model.todos
+                            ++ [ { id = id
+                                 , createdAt = model.time.now
+                                 , title = title
+                                 , description = description
+                                 }
+                               ]
                 in
-                ( { model | todos = todos, form = makeNewForm model.seed }
+                ( { model | todos = todos, form = FormData (makeUuid model.seed) "" "" }
                 , Cmd.batch [ messageFromElm (encodeMessage (SaveTodosList todos)), generateNewSeed ]
                 )
 
@@ -240,15 +347,7 @@ update msg model =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    messageReceiver Recv
-
-
-makeNewForm : Random.Seed -> FormData
-makeNewForm seed =
-    { id = makeUuid seed
-    , title = ""
-    , description = ""
-    }
+    Sub.batch [ messageReceiver Recv, Time.every 1000 Tick ]
 
 
 updateFormTitle : String -> FormData -> FormData
@@ -291,6 +390,8 @@ view model =
 
                 -- , button [ onClick (Send GetNewId) ] [ text "Get new ID" ]
                 ]
+            , div [] [ text ("Time: " ++ makeFormattedTimeString model.time.now) ]
+            , div [] [ text ("Zulu: " ++ makeUTCZuluTimeString model.time.now) ]
             ]
         , main_ []
             [ Html.form [ onSubmit AddTodo ]
@@ -307,13 +408,14 @@ view model =
                 , input [ type_ "submit", value "Add" ] []
                 ]
             , div [ class "todo-list" ]
-                (if List.isEmpty model.todos then
-                    [ text "Add some todos" ]
+                (case model.todos of
+                    [] ->
+                        [ text "Add some todos, brud!" ]
 
-                 else
-                    [ ul [ class ("todo-list " ++ listStyleToClass model.displayStyle) ]
-                        (List.map viewTodoItem <| model.todos)
-                    ]
+                    todos ->
+                        [ ul [ class ("todo-list " ++ listStyleToClass model.displayStyle) ]
+                            (List.map viewTodoItem <| todos)
+                        ]
                 )
             ]
         , footer []
@@ -344,6 +446,11 @@ type alias Flags =
     { seed : Int, todos : List Todo }
 
 
+flagsDecoder : D.Decoder Flags
+flagsDecoder =
+    D.map2 Flags (D.field "seed" (D.oneOf [ D.int, D.null 0 ])) (D.field "todos" (D.list decodeTodo))
+
+
 init : Flags -> ( Model, Cmd Msg )
 init { seed, todos } =
     let
@@ -351,10 +458,16 @@ init { seed, todos } =
             Random.initialSeed seed
     in
     ( { seed = newSeed
-      , todos = todos
-      , form = makeNewForm newSeed
+      , todos = D.decodeString (D.list decodeTodo) todos
+      , form = FormData (makeUuid newSeed) "" ""
+
+      --   , form = makeNewForm newSeed (Time.millisToPosix 0)
       , jsMessage = "[ hello world ]"
       , displayStyle = TodoList
+      , time =
+            { now = Time.millisToPosix 0
+            , zone = Time.utc
+            }
       }
     , generateNewSeed
     )
