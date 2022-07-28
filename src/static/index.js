@@ -1,17 +1,6 @@
 const { Elm } = require('../elm/Main.elm')
 
-import './components/auto-select-input'
 import { nanoid } from 'nanoid'
-
-// class AutoSelectInput extends HtmlElement {
-//   connectedCallback() {
-//     const input = document.createElement('input')
-//     input.onfocus((e) => e.target.select())
-//     this.appendChild(input)
-//   }
-// }
-
-// window.customElements.define('auto-select-input', AutoSelectInput)
 
 const getRandomInts = (n) => {
   const randInts = new Uint32Array(n)
@@ -21,7 +10,7 @@ const getRandomInts = (n) => {
 
 const flags = {
   seed: getRandomInts(5)[0],
-  todos: JSON.parse(localStorage.getItem('todos')),
+  todos: JSON.parse(localStorage.getItem('todos')) ?? [],
 }
 
 const app = Elm.Main.init({ node: document.getElementById('app'), flags })

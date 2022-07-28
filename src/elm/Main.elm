@@ -3,7 +3,7 @@ port module Main exposing (main)
 import Browser exposing (Document)
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (on, onClick, onInput, onSubmit)
+import Html.Events exposing (onClick, onInput, onSubmit)
 import Iso8601
 import Json.Decode as D
 import Json.Encode as E
@@ -17,7 +17,7 @@ import Uuid
 -- MAIN
 
 
-main : Program Flags Model Msg
+main : Program E.Value Model Msg
 main =
     Browser.document
         { init = init
@@ -55,7 +55,6 @@ type SendPortMessage
 type ReceivePortMessage
     = PortString String
     | UnhandledPortMessage String
-    | SomethingFun String
 
 
 type alias RecvMessage =
@@ -71,27 +70,17 @@ decoderRecv =
 
 decodeReceivedMessage : String -> ReceivePortMessage
 decodeReceivedMessage incoming =
-    D.decodeString decoderRecv incoming
-        |> (\result ->
-                case result of
-                    Ok message ->
-                        decodeReceivedPayload message
+    case D.decodeString decoderRecv incoming of
+        Ok message ->
+            decodeReceivedPayload message
 
-                    Err error ->
-                        UnhandledPortMessage (D.errorToString error)
-           )
+        Err error ->
+            UnhandledPortMessage (D.errorToString error)
 
 
 decodeReceivedPayload : RecvMessage -> ReceivePortMessage
-decodeReceivedPayload message =
-    let
-        { type_, payload } =
-            message
-    in
+decodeReceivedPayload { type_, payload } =
     case type_ of
-        "something-fun" ->
-            SomethingFun payload
-
         _ ->
             UnhandledPortMessage
                 ("Unknown message: { type: \""
@@ -106,18 +95,13 @@ decodeReceivedPayload message =
 
 
 
--- / json decoders
--- todoDecoder : D.Decoder SerializableTodo
--- todoDecoder =
---     D.map3 Todo (D.field "id" D.string) (D.field "title" D.string) (D.field "description" D.string)
--- timeDecoder time =
---     Time.millisToPosix time
 -- MODEL
 
 
 type alias Model =
     { seed : Random.Seed
     , todos : List Todo
+    , filteredTodos : List Todo
     , displayStyle : ListStyle
     , form : FormData
     , jsMessage : String
@@ -125,14 +109,6 @@ type alias Model =
         { now : Time.Posix
         , zone : Time.Zone
         }
-    }
-
-
-type alias SerializableTodo =
-    { id : String
-    , createdAt : Maybe Int
-    , title : String
-    , description : String
     }
 
 
@@ -148,36 +124,6 @@ type alias Todo =
 -- should this be Maybe Todo?
 
 
-decodeTodo : D.Decoder Todo
-decodeTodo =
-    D.map4 Todo
-        (D.field "id" D.string)
-        (D.field "createdAt" D.int
-            |> D.andThen
-                (\time ->
-                    case time of
-                        _ ->
-                            D.succeed (Time.millisToPosix 0)
-                )
-        )
-        (D.field "title" D.string)
-        (D.field "description" D.string)
-
-
-
--- decodeTodo value =
---     { id = "123"
---     , createdAt =
---         case value.createdAt of
---             Just time ->
---                 Time.millisToPosix time
---             Nothing ->
---                 Time.millisToPosix 0
---     , title = "abc"
---     , description = "Nothing to see here"
---     }
-
-
 encodeTodo : Todo -> E.Value
 encodeTodo todo =
     E.object
@@ -189,9 +135,7 @@ encodeTodo todo =
 
 
 type alias FormData =
-    { id : String
-
-    -- , createdAt : Time.Posix
+    { id : Maybe String
     , title : String
     , description : String
     }
@@ -224,10 +168,6 @@ makeFormattedTimeString time =
         ++ (String.padLeft 2 '0' <| String.fromInt (Time.toMinute Time.utc time))
         ++ ":"
         ++ (String.padLeft 2 '0' <| String.fromInt (Time.toSecond Time.utc time))
-
-
-
--- 2022-07-26T18:44:37Z
 
 
 makeUTCZuluTimeString : Time.Posix -> String
@@ -264,19 +204,8 @@ update msg model =
             let
                 time =
                     model.time
-
-                form =
-                    model.form
-
-                nextTime =
-                    { time | now = newTime }
-
-                nextForm =
-                    model.form
-
-                -- { form | createdAt = newTime }
             in
-            ( { model | time = nextTime, form = nextForm }, Cmd.none )
+            ( { model | time = { time | now = newTime }, form = model.form }, Cmd.none )
 
         GotNewSeed newSeed ->
             ( { model | seed = newSeed }, Cmd.none )
@@ -306,23 +235,25 @@ update msg model =
 
                     todos =
                         model.todos
-                            ++ [ { id = id
+                            ++ [ { id = Maybe.withDefault (makeUuid model.seed) id
                                  , createdAt = model.time.now
                                  , title = title
                                  , description = description
                                  }
                                ]
                 in
-                ( { model | todos = todos, form = FormData (makeUuid model.seed) "" "" }
+                ( { model | todos = todos, form = FormData Nothing "" "" }
                 , Cmd.batch [ messageFromElm (encodeMessage (SaveTodosList todos)), generateNewSeed ]
                 )
 
         DeleteTodo id ->
             let
-                todos =
+                newTodos =
                     List.filter (\td -> td.id /= id) model.todos
             in
-            ( { model | todos = todos }, messageFromElm (encodeMessage (SaveTodosList todos)) )
+            ( { model | todos = newTodos }
+            , messageFromElm (encodeMessage (SaveTodosList newTodos))
+            )
 
         DeleteAllTodos ->
             ( { model | todos = [] }, messageFromElm (encodeMessage (SaveTodosList [])) )
@@ -333,9 +264,6 @@ update msg model =
         Recv message ->
             case decodeReceivedMessage message of
                 PortString text ->
-                    ( { model | jsMessage = text }, Cmd.none )
-
-                SomethingFun text ->
                     ( { model | jsMessage = text }, Cmd.none )
 
                 UnhandledPortMessage text ->
@@ -374,25 +302,7 @@ view : Model -> Document Msg
 view model =
     { title = "Tasks.TimothyPew_com"
     , body =
-        [ header []
-            [ nav []
-                [ button [ onClick (SetDisplayType TodoGrid) ] [ text "Grid" ]
-                , button [ onClick (SetDisplayType TodoList) ] [ text "List" ]
-                , text " | "
-                , button [ onClick DeleteAllTodos ] [ text "Delete All" ]
-                , text " | "
-                , button [ onClick (Recv "{ \"type\": \"something-fun\", \"payload\": \"Hello, World!\"}") ] [ text "Recv Success" ]
-                , button [ onClick (Recv "{ \"type\": \"important message\", \"payload\": \"very importnat meassage!\"}") ] [ text "Recv Unhandled" ]
-                , button [ onClick (Recv "{ type\":d \"something-fun\", \"payload\": \"Hello, World!\"}") ] [ text "Recv Error" ]
-
-                -- , button [ onClick (Send (SendText "buttholes")) ] [ text "Send to Port" ]
-                , text " | "
-
-                -- , button [ onClick (Send GetNewId) ] [ text "Get new ID" ]
-                ]
-            , div [] [ text ("Time: " ++ makeFormattedTimeString model.time.now) ]
-            , div [] [ text ("Zulu: " ++ makeUTCZuluTimeString model.time.now) ]
-            ]
+        [ viewHeader model
         , main_ []
             [ Html.form [ onSubmit AddTodo ]
                 [ label []
@@ -402,34 +312,54 @@ view model =
                 , label []
                     [ span [] [ text "Description" ]
                     , textarea [ placeholder "Todo description/notes", onInput NewFormDescription, value model.form.description ] []
-
-                    -- , viewInput "task-desc" "textarea" "Todo description/notes" model.form.description NewFormDescription
                     ]
                 , input [ type_ "submit", value "Add" ] []
                 ]
             , div [ class "todo-list" ]
-                (case model.todos of
-                    [] ->
-                        [ text "Add some todos, brud!" ]
+                (if List.isEmpty model.todos then
+                    [ text "Add some todos, brud!" ]
 
-                    todos ->
-                        [ ul [ class ("todo-list " ++ listStyleToClass model.displayStyle) ]
-                            (List.map viewTodoItem <| todos)
-                        ]
+                 else
+                    [ ul [ class ("todo-list " ++ listStyleToClass model.displayStyle) ]
+                        (List.map viewTodoItem <| model.todos)
+                    ]
                 )
             ]
-        , footer []
-            [ div [ class "debug" ]
-                [ div []
-                    (model.jsMessage
-                        |> String.split "\n"
-                        |> List.filter (not << String.isEmpty)
-                        |> List.map (\line -> p [] [ text line ])
-                    )
-                ]
-            ]
+        , viewFooter model
         ]
     }
+
+
+viewHeader : Model -> Html Msg
+viewHeader model =
+    header []
+        [ nav []
+            [ case model.displayStyle of
+                TodoList ->
+                    button [ onClick (SetDisplayType TodoGrid) ] [ text "View as Grid" ]
+
+                TodoGrid ->
+                    button [ onClick (SetDisplayType TodoList) ] [ text "View as List" ]
+            , text " | "
+            , button [ onClick DeleteAllTodos ] [ text "Delete All" ]
+            ]
+        , div [] [ text ("Time: " ++ makeFormattedTimeString model.time.now) ]
+        , div [] [ text ("Zulu: " ++ makeUTCZuluTimeString model.time.now) ]
+        ]
+
+
+viewFooter : Model -> Html Msg
+viewFooter model =
+    footer []
+        [ div [ class "debug" ]
+            [ div []
+                (model.jsMessage
+                    |> String.split "\n"
+                    |> List.filter (not << String.isEmpty)
+                    |> List.map (\line -> p [] [ text line ])
+                )
+            ]
+        ]
 
 
 viewTodoItem : Todo -> Html Msg
@@ -446,23 +376,30 @@ type alias Flags =
     { seed : Int, todos : List Todo }
 
 
-flagsDecoder : D.Decoder Flags
-flagsDecoder =
-    D.map2 Flags (D.field "seed" (D.oneOf [ D.int, D.null 0 ])) (D.field "todos" (D.list decodeTodo))
+
+-- init : Flags -> ( Model, Cmd Msg )
 
 
-init : Flags -> ( Model, Cmd Msg )
-init { seed, todos } =
-    let
-        newSeed =
-            Random.initialSeed seed
-    in
-    ( { seed = newSeed
-      , todos = D.decodeString (D.list decodeTodo) todos
-      , form = FormData (makeUuid newSeed) "" ""
+init : E.Value -> ( Model, Cmd Msg )
+init flags =
+    ( let
+        { seed, todos } =
+            case D.decodeValue flagDecoder flags of
+                Ok res ->
+                    { seed = Random.initialSeed res.seed
+                    , todos = res.todos
+                    }
 
-      --   , form = makeNewForm newSeed (Time.millisToPosix 0)
-      , jsMessage = "[ hello world ]"
+                Err _ ->
+                    { seed = 435356454
+                    , todos = []
+                    }
+      in
+      { seed = seed
+      , todos = todos
+      , filteredTodos = todos
+      , form = FormData Nothing "" ""
+      , jsMessage = "ello, world"
       , displayStyle = TodoList
       , time =
             { now = Time.millisToPosix 0
@@ -471,3 +408,26 @@ init { seed, todos } =
       }
     , generateNewSeed
     )
+
+
+flagDecoder : D.Decoder { seed : Int, todos : List Todo }
+flagDecoder =
+    D.map2 Flags
+        (D.field "seed" D.int)
+        (D.field "todos" (D.list todoDecoder))
+
+
+intToPosixDecoder : D.Decoder Time.Posix
+intToPosixDecoder =
+    D.int
+        |> D.andThen
+            (\time -> D.succeed (Time.millisToPosix time))
+
+
+todoDecoder : D.Decoder Todo
+todoDecoder =
+    D.map4 Todo
+        (D.field "id" D.string)
+        (D.field "createdAt" intToPosixDecoder)
+        (D.field "title" D.string)
+        (D.field "description" D.string)
