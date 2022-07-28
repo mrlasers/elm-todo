@@ -102,7 +102,7 @@ type alias Model =
     { seed : Random.Seed
     , todos : List Todo
     , filteredTodos : List Todo
-    , displayStyle : ListStyle
+    , todoView : TodoView
     , form : FormData
     , jsMessage : String
     , time :
@@ -141,13 +141,18 @@ type alias FormData =
     }
 
 
-type ListStyle
+type FormUpdate
+    = UpdateTitle String
+    | UpdateDescription String
+
+
+type TodoView
     = TodoGrid
     | TodoList
 
 
-listStyleToClass : ListStyle -> String
-listStyleToClass style =
+todoViewToString : TodoView -> String
+todoViewToString style =
     case style of
         TodoGrid ->
             "grid"
@@ -183,9 +188,8 @@ type Msg
     = Noop
     | GotNewSeed Random.Seed
     | AddTodo
-    | NewFormTitle String
-    | NewFormDescription String
-    | SetDisplayType ListStyle
+    | UpdateForm FormUpdate
+    | SetDisplayType TodoView
     | DeleteTodo String
     | DeleteAllTodos
     | Recv String
@@ -210,19 +214,25 @@ update msg model =
         GotNewSeed newSeed ->
             ( { model | seed = newSeed }, Cmd.none )
 
-        NewFormTitle title ->
-            ( { model | form = model.form |> updateFormTitle title }, Cmd.none )
+        UpdateForm field ->
+            let
+                { form } =
+                    model
+            in
+            case field of
+                UpdateTitle title ->
+                    ( { model | form = { form | title = title } }, Cmd.none )
 
-        NewFormDescription description ->
-            ( { model | form = model.form |> updateFormDescription description }, Cmd.none )
+                UpdateDescription desc ->
+                    ( { model | form = { form | description = desc } }, Cmd.none )
 
         SetDisplayType style ->
             case style of
                 TodoGrid ->
-                    ( { model | displayStyle = TodoGrid }, Cmd.none )
+                    ( { model | todoView = TodoGrid }, Cmd.none )
 
                 TodoList ->
-                    ( { model | displayStyle = TodoList }, Cmd.none )
+                    ( { model | todoView = TodoList }, Cmd.none )
 
         AddTodo ->
             if String.isEmpty model.form.title then
@@ -234,13 +244,7 @@ update msg model =
                         model.form
 
                     todos =
-                        model.todos
-                            ++ [ { id = Maybe.withDefault (makeUuid model.seed) id
-                                 , createdAt = model.time.now
-                                 , title = title
-                                 , description = description
-                                 }
-                               ]
+                        Todo (Maybe.withDefault (makeUuid model.seed) id) model.time.now title description :: model.todos
                 in
                 ( { model | todos = todos, form = FormData Nothing "" "" }
                 , Cmd.batch [ messageFromElm (encodeMessage (SaveTodosList todos)), generateNewSeed ]
@@ -307,11 +311,23 @@ view model =
             [ Html.form [ onSubmit AddTodo ]
                 [ label []
                     [ span [] [ text "Title" ]
-                    , input [ id "task-title", placeholder "Todo0 title", onInput NewFormTitle, value model.form.title, onClickToFocus "task-title" ] []
+                    , input
+                        [ id "task-title"
+                        , placeholder "Todo0 title"
+                        , value model.form.title
+                        , onClickToFocus "task-title"
+                        , onInput (UpdateForm << UpdateTitle)
+                        ]
+                        []
                     ]
                 , label []
                     [ span [] [ text "Description" ]
-                    , textarea [ placeholder "Todo description/notes", onInput NewFormDescription, value model.form.description ] []
+                    , textarea
+                        [ placeholder "Todo description/notes"
+                        , value model.form.description
+                        , onInput (UpdateForm << UpdateDescription)
+                        ]
+                        []
                     ]
                 , input [ type_ "submit", value "Add" ] []
                 ]
@@ -320,7 +336,7 @@ view model =
                     [ text "Add some todos, brud!" ]
 
                  else
-                    [ ul [ class ("todo-list " ++ listStyleToClass model.displayStyle) ]
+                    [ ul [ class ("todo-list " ++ todoViewToString model.todoView) ]
                         (List.map viewTodoItem <| model.todos)
                     ]
                 )
@@ -334,7 +350,7 @@ viewHeader : Model -> Html Msg
 viewHeader model =
     header []
         [ nav []
-            [ case model.displayStyle of
+            [ case model.todoView of
                 TodoList ->
                     button [ onClick (SetDisplayType TodoGrid) ] [ text "View as Grid" ]
 
@@ -391,7 +407,7 @@ init flags =
                     }
 
                 Err _ ->
-                    { seed = 435356454
+                    { seed = Random.initialSeed 666
                     , todos = []
                     }
       in
@@ -400,7 +416,7 @@ init flags =
       , filteredTodos = todos
       , form = FormData Nothing "" ""
       , jsMessage = "ello, world"
-      , displayStyle = TodoList
+      , todoView = TodoList
       , time =
             { now = Time.millisToPosix 0
             , zone = Time.utc
