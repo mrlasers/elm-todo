@@ -1,6 +1,7 @@
 port module Main exposing (main)
 
 import Browser exposing (Document)
+import Browser.Events exposing (onKeyDown)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput, onSubmit)
@@ -46,10 +47,16 @@ encodeMessage msg =
         SaveTodosList todos ->
             E.object [ ( "type", E.string "save-todos" ), ( "payload", E.list encodeTodo todos ) ]
 
+        LogToConsole value ->
+            case msg of
+                _ ->
+                    E.object [ ( "type", E.string "console-log" ), ( "payload", value ) ]
+
 
 type SendPortMessage
     = FocusInputById String
     | SaveTodosList (List Todo)
+    | LogToConsole E.Value
 
 
 type ReceivePortMessage
@@ -303,11 +310,13 @@ view model =
     , body =
         [ viewHeader model
         , main_ []
-            [ Html.form [ onSubmit AddTodo ]
+            [ Html.form [ class "new-task", onSubmit AddTodo ]
                 [ label []
                     [ span [] [ text "Title" ]
                     , input
                         [ id "task-title"
+                        , type_ "text"
+                        , autocomplete False
                         , placeholder "Todo0 title"
                         , value model.form.title
                         , onClickToFocus "task-title"
