@@ -112,6 +112,11 @@ type alias Model =
     }
 
 
+type TodoStatus
+    = Complete Time.Posix
+    | Incomplete
+
+
 type alias Todo =
     { id : String
     , createdAt : Time.Posix
@@ -141,7 +146,7 @@ type alias FormData =
     }
 
 
-type FormUpdate
+type FormFieldUpdate
     = UpdateTitle String
     | UpdateDescription String
 
@@ -188,7 +193,7 @@ type Msg
     = Noop
     | GotNewSeed Random.Seed
     | AddTodo
-    | UpdateForm FormUpdate
+    | UpdateForm FormFieldUpdate
     | SetDisplayType TodoView
     | DeleteTodo String
     | DeleteAllTodos
@@ -280,16 +285,6 @@ update msg model =
 subscriptions : Model -> Sub Msg
 subscriptions _ =
     Sub.batch [ messageReceiver Recv, Time.every 1000 Tick ]
-
-
-updateFormTitle : String -> FormData -> FormData
-updateFormTitle title form =
-    { form | title = title }
-
-
-updateFormDescription : String -> FormData -> FormData
-updateFormDescription description form =
-    { form | description = description }
 
 
 generateNewSeed : Cmd Msg
@@ -447,3 +442,7 @@ todoDecoder =
         (D.field "createdAt" intToPosixDecoder)
         (D.field "title" D.string)
         (D.field "description" D.string)
+
+
+
+-- (D.field "status" (D.map2 ))
