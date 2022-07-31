@@ -1,4 +1,4 @@
-port module Main exposing (main)
+port module Main exposing (main, todoDecoder)
 
 import Browser exposing (Document)
 import Browser.Events exposing (onKeyDown)
@@ -7,11 +7,12 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput, onSubmit)
 import Iso8601
 import Json.Decode as D
+import Json.Decode.Pipeline as DP
 import Json.Encode as E
 import List
 import Random
 import Time
-import Uuid
+import Uuid exposing (Uuid)
 
 
 
@@ -110,6 +111,7 @@ type alias Model =
     , todos : List Todo
     , filteredTodos : List Todo
     , todoView : TodoView
+    , editing : Maybe Uuid.Uuid
     , form : FormData
     , jsMessage : String
     , time :
@@ -125,10 +127,20 @@ type TodoStatus
 
 
 type alias Todo =
-    { id : String
+    { id : Uuid.Uuid
     , createdAt : Time.Posix
     , title : String
     , description : String
+    , tasks : List TodoTask
+    }
+
+
+type alias TodoTask =
+    { id : Uuid
+    , title : String
+    , start : Maybe Time.Posix
+
+    -- , end : Maybe Time.Posix
     }
 
 
@@ -139,7 +151,7 @@ type alias Todo =
 encodeTodo : Todo -> E.Value
 encodeTodo todo =
     E.object
-        [ ( "id", E.string todo.id )
+        [ ( "id", E.string <| Uuid.toString todo.id )
         , ( "createdAt", E.int (Time.posixToMillis todo.createdAt) )
         , ( "title", E.string todo.title )
         , ( "description", E.string todo.description )
@@ -147,7 +159,7 @@ encodeTodo todo =
 
 
 type alias FormData =
-    { id : Maybe String
+    { id : Maybe Uuid.Uuid
     , title : String
     , description : String
     }
@@ -173,9 +185,9 @@ todoViewToString style =
             "list"
 
 
-makeUuid : Random.Seed -> String
+makeUuid : Random.Seed -> Uuid.Uuid
 makeUuid seed =
-    seed |> Random.step Uuid.uuidGenerator |> Tuple.mapFirst Uuid.toString |> Tuple.first
+    seed |> Random.step Uuid.uuidGenerator |> Tuple.first
 
 
 makeFormattedTimeString : Time.Posix -> String
@@ -202,7 +214,7 @@ type Msg
     | AddTodo
     | UpdateForm FormFieldUpdate
     | SetDisplayType TodoView
-    | DeleteTodo String
+    | DeleteTodo Uuid.Uuid
     | DeleteAllTodos
     | Recv String
     | UpdateJsMessage String
@@ -256,7 +268,7 @@ update msg model =
                         model.form
 
                     todos =
-                        Todo (Maybe.withDefault (makeUuid model.seed) id) model.time.now title description :: model.todos
+                        Todo (Maybe.withDefault (makeUuid model.seed) id) model.time.now title description [] :: model.todos
                 in
                 ( { model | todos = todos, form = FormData Nothing "" "" }
                 , Cmd.batch [ messageFromElm (encodeMessage (SaveTodosList todos)), generateNewSeed ]
@@ -341,7 +353,7 @@ view model =
 
                  else
                     [ ul [ class ("todo-list " ++ todoViewToString model.todoView) ]
-                        (List.map viewTodoItem <| model.todos)
+                        (List.map (viewTodoItem model.editing) <| model.todos)
                     ]
                 )
             ]
@@ -382,22 +394,31 @@ viewFooter model =
         ]
 
 
-viewTodoItem : Todo -> Html Msg
-viewTodoItem { title, id, description } =
-    li [ class "todo-item" ]
-        [ h3 [] [ text title ]
-        , p [] [ text description ]
-        , div [ class "id" ] [ text id ]
-        , span [ class "delete", onClick (DeleteTodo id) ] [ text "❌" ]
-        ]
+viewTodoItem : Maybe Uuid.Uuid -> Todo -> Html Msg
+viewTodoItem editing { title, id, description } =
+    let
+        isEditing =
+            case editing of
+                Just editId ->
+                    editId == id
+
+                Nothing ->
+                    False
+    in
+    if isEditing then
+        div [] [ text "i'm being edited" ]
+
+    else
+        li [ class "todo-item" ]
+            [ h3 [] [ text title ]
+            , p [] [ text description ]
+            , div [ class "id" ] [ text <| Uuid.toString id ]
+            , span [ class "delete", onClick (DeleteTodo id) ] [ text "❌" ]
+            ]
 
 
 type alias Flags =
     { seed : Int, todos : List Todo }
-
-
-
--- init : Flags -> ( Model, Cmd Msg )
 
 
 init : E.Value -> ( Model, Cmd Msg )
@@ -418,6 +439,7 @@ init flags =
       { seed = seed
       , todos = todos
       , filteredTodos = todos
+      , editing = Nothing
       , form = FormData Nothing "" ""
       , jsMessage = "ello, world"
       , todoView = TodoList
@@ -446,12 +468,21 @@ intToPosixDecoder =
 
 todoDecoder : D.Decoder Todo
 todoDecoder =
-    D.map4 Todo
-        (D.field "id" D.string)
-        (D.field "createdAt" intToPosixDecoder)
-        (D.field "title" D.string)
-        (D.field "description" D.string)
+    D.succeed Todo
+        |> DP.required "id" Uuid.decoder
+        |> DP.required "createdAt" intToPosixDecoder
+        |> DP.required "title" D.string
+        |> DP.required "description" D.string
+        |> DP.optional "tasks" (D.list todoTaskDecoder) []
+
+
+todoTaskDecoder : D.Decoder TodoTask
+todoTaskDecoder =
+    D.succeed TodoTask
+        |> DP.required "id" Uuid.decoder
+        |> DP.required "title" D.string
+        |> DP.optional "start" (D.nullable intToPosixDecoder) Nothing
 
 
 
--- (D.field "status" (D.map2 ))
+-- |> DP.optional "end" (D.nullable intToPosixDecoder)
