@@ -1,4 +1,4 @@
-port module Main exposing (main)
+port module Main exposing (flagsDecoder, main)
 
 import Browser exposing (Document)
 import Browser.Events exposing (onKeyDown)
@@ -561,7 +561,7 @@ init : E.Value -> ( Model, Cmd Msg )
 init flags =
     ( let
         { seed, todos } =
-            case D.decodeValue flagDecoder flags of
+            case D.decodeValue flagsDecoder flags of
                 Ok res ->
                     { seed = Random.initialSeed res.seed
                     , todos = res.todos
@@ -588,8 +588,8 @@ init flags =
     )
 
 
-flagDecoder : D.Decoder { seed : Int, todos : List Todo }
-flagDecoder =
+flagsDecoder : D.Decoder { seed : Int, todos : List Todo }
+flagsDecoder =
     D.succeed Flags
         |> DP.required "seed" D.int
         |> DP.required "todos" (D.list todoDecoder)

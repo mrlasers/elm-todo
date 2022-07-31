@@ -5,10 +5,11 @@ import Fuzz exposing (Fuzzer, int, list, string)
 import Html.Attributes exposing (title)
 import Json.Decode as D
 import Json.Encode as E
+import Main exposing (flagsDecoder)
 import Random
 import Test exposing (..)
 import Time
-import Todo exposing (Todo, TodoTask, posixDecoder, todoDecoder, todoEncoder, todoTaskDecoder)
+import Todo exposing (Todo, TodoTask, posixDecoder, todoDecoder, todoEncoder, todoTaskDecoder, todosDecoder)
 import Uuid exposing (Uuid)
 
 
@@ -19,10 +20,29 @@ makeUuid i =
             Random.initialSeed i
 
 
+flagsTests : Test
+flagsTests =
+    test "decodes some flags" <|
+        \_ ->
+            """{
+    "seed": 666,
+    "todos": [{"id":"9141f1ca-8740-4b88-a8f4-c138fc19772d","createdAt":1659260320055,"title":"Goodnight, Moon.","description":"The End."},{"id":"1c4e3106-69d7-4020-97d3-9dccd3b8abc3","createdAt":1659260308047,"title":"Hello, World!","description":"He was a dark and stormy knight..."}]
+    }"""
+                |> D.decodeString flagsDecoder
+                |> Expect.ok
+
+
 todoTests : Test
 todoTests =
     describe "Todo"
-        [ fuzz3 int int string "decodes a todo" <|
+        [ test "decodes some todos in a list" <|
+            \_ ->
+                """
+                [{"id":"9141f1ca-8740-4b88-a8f4-c138fc19772d","createdAt":1659260320055,"title":"Goodnight, Moon.","description":"The End."},{"id":"1c4e3106-69d7-4020-97d3-9dccd3b8abc3","createdAt":1659260308047,"title":"Hello, World!","description":"He was a dark and stormy knight..."}]
+                """
+                    |> D.decodeString todosDecoder
+                    |> Expect.ok
+        , fuzz3 int int string "decodes a todo" <|
             \seed time text ->
                 Todo (makeUuid seed)
                     (Time.millisToPosix time)

@@ -1,6 +1,7 @@
 const { Elm } = require('../elm/Main.elm')
 
 const flags = {
+  seed: Math.floor(Math.random() * 0xffffffff),
   todos: JSON.parse(localStorage.getItem('todos') ?? '[]'),
 }
 

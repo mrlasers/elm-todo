@@ -21,6 +21,11 @@ posixDecoder =
     D.int |> D.andThen (\time -> D.succeed (Time.millisToPosix time))
 
 
+todosDecoder : D.Decoder (List Todo)
+todosDecoder =
+    D.list todoDecoder
+
+
 todoDecoder : D.Decoder Todo
 todoDecoder =
     D.succeed Todo
