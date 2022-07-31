@@ -57,6 +57,10 @@ type alias TodoTask =
     }
 
 
+type alias TodoTaskRange =
+    ( Maybe Posix, Maybe Posix, Maybe Int )
+
+
 todoTaskDecoder : D.Decoder TodoTask
 todoTaskDecoder =
     D.succeed TodoTask

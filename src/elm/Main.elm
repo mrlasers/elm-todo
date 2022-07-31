@@ -391,10 +391,14 @@ update msg model =
                         Incomplete
 
                     tasks =
-                        []
+                        if List.isEmpty model.form.tasks then
+                            Nothing
+
+                        else
+                            Just model.form.tasks
 
                     todos =
-                        Todo (Maybe.withDefault (makeUuid model.seed) (Just id)) model.time.now title description Nothing :: model.todos
+                        Todo (Maybe.withDefault (makeUuid model.seed) (Just id)) model.time.now title description tasks :: model.todos
                 in
                 ( { model | todos = todos, form = FormData Nothing "" "" [] }
                 , Cmd.batch [ messageFromElm (encodeMessage (SaveTodosList todos)), generateNewSeed ]
@@ -532,7 +536,7 @@ viewFooter model =
 
 
 viewTodoItem : Maybe Uuid -> Todo -> Html Msg
-viewTodoItem editing { title, id, description } =
+viewTodoItem editing { title, id, description, tasks } =
     let
         isEditing =
             case editing of
@@ -551,6 +555,14 @@ viewTodoItem editing { title, id, description } =
             , p [] [ text description ]
             , div [ class "id" ] [ text <| Uuid.toString id ]
             , span [ class "delete", onClick (DeleteTodo id) ] [ text "❌" ]
+            , div []
+                (case tasks of
+                    Nothing ->
+                        [ text "No tasks" ]
+
+                    Just maybeTasks ->
+                        [ Html.table [] (List.map (\task -> tr [] [ th [] [ text task.title ] ]) maybeTasks) ]
+                )
             ]
 
 
