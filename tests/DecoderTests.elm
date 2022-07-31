@@ -3,9 +3,8 @@ module DecoderTests exposing (..)
 import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer, int, list, string)
 import Json.Decode as D
-import Json.Decode.Pipeline as DP
 import Json.Encode as E
-import Random exposing (initialSeed, step)
+import Random
 import Test exposing (..)
 import Time
 import Todo exposing (Todo, posixDecoder, todoDecoder, todoEncoder, todoTaskDecoder)
@@ -45,22 +44,24 @@ todoTaskTests =
                     |> Expect.equal (Ok title)
         , fuzz3 int int string "decodes todotask wtih start date" <|
             \seed time title ->
-                Todo.TodoTask (makeUuid seed) title (time |> Just << Time.millisToPosix) (time + seed |> Just << Time.millisToPosix)
+                Todo.TodoTask (makeUuid seed)
+                    title
+                    (time |> Just << Time.millisToPosix)
+                    Nothing
                     |> Todo.todoTaskEncoder
                     |> D.decodeValue todoTaskDecoder
                     |> Result.map .title
                     |> Expect.equal (Ok title)
-        , fuzz3 int int string "decodes todotask wtih start & end dates" <|
-            \seed time text ->
-                [ ( "id", Uuid.encode <| makeUuid seed )
-                , ( "title", E.string text )
-                , ( "start", E.int time )
-                , ( "end", E.int <| time + seed )
-                ]
-                    |> E.object
+        , fuzz3 int int string "decodes todotask with start & end dates" <|
+            \seed time title ->
+                Todo.TodoTask (makeUuid seed)
+                    title
+                    (time |> Just << Time.millisToPosix)
+                    (time + seed |> Just << Time.millisToPosix)
+                    |> Todo.todoTaskEncoder
                     |> D.decodeValue todoTaskDecoder
                     |> Result.map .title
-                    |> Expect.equal (Ok text)
+                    |> Expect.equal (Ok title)
         ]
 
 
