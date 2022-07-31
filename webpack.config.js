@@ -14,7 +14,8 @@ const commonConfig = {
     filename: '[name].js',
   },
   resolve: {
-    extensions: ['.js', '.elm'],
+    extensions: ['.js', '.jsx', '.ts', '.tsx', '.elm'],
+    modules: ['node_modules'],
   },
   module: {
     noParse: /\.elm$/,
@@ -29,7 +30,7 @@ const commonConfig = {
 }
 const devConfig = {
   entry: [
-    'webpack-dev-server/client?http://localhost:8080',
+    // 'webpack-dev-server/client?http://localhost:8080',
     './src/static/index.js',
     './src/static/styles/main.scss',
   ],
@@ -48,7 +49,7 @@ const devConfig = {
   },
   devServer: {
     static: {
-      directory: Path.resolve(__dirname, 'dist'),
+      directory: Path.resolve(__dirname, 'src/static'),
     },
     hot: true,
   },

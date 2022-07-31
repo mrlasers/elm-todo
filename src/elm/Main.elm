@@ -450,7 +450,8 @@ view model =
     , body =
         [ viewHeader model
         , main_ []
-            [ Html.form [ class "new-task", onSubmit AddTodo ]
+            [ div [] [ text "put editor here" ]
+            , Html.form [ class "new-task", onSubmit AddTodo ]
                 [ label []
                     [ span [] [ text "Title" ]
                     , input
