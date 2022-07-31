@@ -45,6 +45,10 @@ footer {
 
     li {
       background-color: lightsalmon;
+
+      &.complete {
+        background-color: grey;
+      }
     }
   }
 }
@@ -88,7 +92,17 @@ form.new-task {
     }
   }
 
-  input[type='submit'] {
+  .buttons {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  input[type='button'] {
+    aspect-ratio: 1/1;
+  }
+
+  input[type='submit'],
+  input[type='button'] {
     border-radius: 1em;
 
     &:active {
