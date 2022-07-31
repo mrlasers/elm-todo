@@ -3,7 +3,8 @@
   "packageManager": "yarn@3.2.2",
   "scripts": {
     "dev": "webpack serve --mode=development",
-    "build": "webpack --mode=production"
+    "build": "webpack --mode=production",
+    "test": "elm-test"
   },
   "devDependencies": {
     "css-loader": "^6.7.1",

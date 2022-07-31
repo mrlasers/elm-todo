@@ -1,4 +1,4 @@
-port module Main exposing (main)
+port module Main exposing (main, todoDecoder)
 
 import Browser exposing (Document)
 import Browser.Events exposing (onKeyDown)
@@ -14,7 +14,7 @@ import Platform exposing (Task)
 import Random
 import Task
 import Time
-import Uuid
+import Uuid exposing (Uuid)
 
 
 
@@ -113,6 +113,7 @@ type alias Model =
     , todos : List Todo
     , filteredTodos : List Todo
     , todoView : TodoView
+    , editing : Maybe Uuid.Uuid
     , form : FormData
     , jsMessage : String
     , time :
@@ -136,12 +137,20 @@ type alias TodoTask =
 
 
 type alias Todo =
-    { id : String
+    { id : Uuid.Uuid
     , createdAt : Time.Posix
     , title : String
     , description : String
-    , status : TodoStatus
     , tasks : List TodoTask
+    }
+
+
+type alias TodoTask =
+    { id : Uuid
+    , title : String
+    , start : Maybe Time.Posix
+
+    -- , end : Maybe Time.Posix
     }
 
 
@@ -152,7 +161,7 @@ type alias Todo =
 encodeTodo : Todo -> E.Value
 encodeTodo todo =
     E.object
-        [ ( "id", E.string todo.id )
+        [ ( "id", E.string <| Uuid.toString todo.id )
         , ( "createdAt", E.int (Time.posixToMillis todo.createdAt) )
         , ( "title", E.string todo.title )
         , ( "description", E.string todo.description )
@@ -196,7 +205,7 @@ encodeTodoTask task =
 
 
 type alias FormData =
-    { id : Maybe String
+    { id : Maybe Uuid.Uuid
     , title : String
     , description : String
     , tasks : List TodoTask
@@ -225,9 +234,9 @@ todoViewToString style =
             "list"
 
 
-makeUuid : Random.Seed -> String
+makeUuid : Random.Seed -> Uuid.Uuid
 makeUuid seed =
-    seed |> Random.step Uuid.uuidGenerator |> Tuple.mapFirst Uuid.toString |> Tuple.first
+    seed |> Random.step Uuid.uuidGenerator |> Tuple.first
 
 
 makeFormattedTimeString : { now : Time.Posix, zone : Time.Zone } -> String
@@ -263,7 +272,7 @@ type Msg
     | AddTodo
     | UpdateForm FormFieldUpdate
     | SetDisplayType TodoView
-    | DeleteTodo String
+    | DeleteTodo Uuid.Uuid
     | DeleteAllTodos
     | UpdateTodo String TodoUpdate
     | Recv String
@@ -420,14 +429,7 @@ update msg model =
                         []
 
                     todos =
-                        Todo
-                            id
-                            createdAt
-                            title
-                            description
-                            status
-                            tasks
-                            :: model.todos
+                        Todo (Maybe.withDefault (makeUuid model.seed) id) model.time.now title description [] :: model.todos
                 in
                 ( { model | todos = todos, form = FormData Nothing "" "" [] }
                 , Cmd.batch [ messageFromElm (encodeMessage (SaveTodosList todos)), generateNewSeed ]
@@ -522,7 +524,7 @@ view model =
 
                  else
                     [ ul [ class ("todo-list " ++ todoViewToString model.todoView) ]
-                        (List.map viewTodoItem <| model.todos)
+                        (List.map (viewTodoItem model.editing) <| model.todos)
                     ]
                 )
             ]
@@ -563,43 +565,31 @@ viewFooter model =
         ]
 
 
-viewTodoItem : Todo -> Html Msg
-viewTodoItem { title, id, description, status, tasks } =
+viewTodoItem : Maybe Uuid.Uuid -> Todo -> Html Msg
+viewTodoItem editing { title, id, description } =
     let
-        activeClass =
-            case status of
-                Complete _ ->
-                    "complete"
+        isEditing =
+            case editing of
+                Just editId ->
+                    editId == id
 
-                _ ->
-                    ""
+                Nothing ->
+                    False
     in
-    li [ class <| String.trim <| "todo-item " ++ activeClass ]
-        [ h3 [] [ text title ]
-        , p [] [ text description ]
-        , div [ class "id" ] [ text id ]
-        , div [ class "tasks" ]
-            (tasks
-                |> List.map
-                    (\task ->
-                        div []
-                            [ input [ value task.title, onInput (\value -> UpdateTodo id (UpdateTask task.id value)) ] []
-                            , button [ onClick (UpdateTodo id (DeleteTask task.id)) ] [ text "X" ]
-                            ]
-                    )
-            )
-        , button [ onClick (UpdateTodo id ToggleComplete) ] [ text "Complete?" ]
-        , button [ onClick (UpdateTodo id AddTask) ] [ text "+Task" ]
-        , button [ class "delete", onClick (DeleteTodo id) ] [ text "❌" ]
-        ]
+    if isEditing then
+        div [] [ text "i'm being edited" ]
+
+    else
+        li [ class "todo-item" ]
+            [ h3 [] [ text title ]
+            , p [] [ text description ]
+            , div [ class "id" ] [ text <| Uuid.toString id ]
+            , span [ class "delete", onClick (DeleteTodo id) ] [ text "❌" ]
+            ]
 
 
 type alias Flags =
     { seed : Int, todos : List Todo }
-
-
-
--- init : Flags -> ( Model, Cmd Msg )
 
 
 init : E.Value -> ( Model, Cmd Msg )
@@ -620,7 +610,8 @@ init flags =
       { seed = seed
       , todos = todos
       , filteredTodos = todos
-      , form = FormData Nothing "" "" []
+      , editing = Nothing
+      , form = FormData Nothing "" ""
       , jsMessage = "ello, world"
       , todoView = TodoList
       , time =
@@ -649,30 +640,19 @@ intToPosixDecoder =
 todoDecoder : D.Decoder Todo
 todoDecoder =
     D.succeed Todo
-        |> DP.required "id" D.string
+        |> DP.required "id" Uuid.decoder
         |> DP.required "createdAt" intToPosixDecoder
         |> DP.required "title" D.string
         |> DP.required "description" D.string
-        |> DP.optional "status"
-            (todoStatusDecoder
-                |> D.andThen
-                    (\{ status, date } ->
-                        case ( status, date ) of
-                            ( "complete", Just d ) ->
-                                D.succeed (Complete (Time.millisToPosix d))
-
-                            ( _, _ ) ->
-                                D.succeed Incomplete
-                    )
-            )
-            Incomplete
         |> DP.optional "tasks" (D.list todoTaskDecoder) []
 
 
-type alias TodoStatusJson =
-    { status : String
-    , date : Maybe Int
-    }
+todoTaskDecoder : D.Decoder TodoTask
+todoTaskDecoder =
+    D.succeed TodoTask
+        |> DP.required "id" Uuid.decoder
+        |> DP.required "title" D.string
+        |> DP.optional "start" (D.nullable intToPosixDecoder) Nothing
 
 
 todoStatusDecoder : D.Decoder TodoStatusJson
@@ -689,3 +669,7 @@ todoTaskDecoder =
         |> DP.required "start" (D.nullable intToPosixDecoder)
         |> DP.required "end" (D.nullable intToPosixDecoder)
         |> DP.required "title" D.string
+
+
+
+-- |> DP.optional "end" (D.nullable intToPosixDecoder)
