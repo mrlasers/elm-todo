@@ -7,7 +7,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput, onSubmit)
 import Iso8601
 import Json.Decode as D
-import Json.Decode.Pipeline as DP
+import Json.Decode.Pipeline as DP exposing (optional, required)
 import Json.Encode as E
 import List
 import Platform exposing (Task)
@@ -49,7 +49,7 @@ encodeMessage msg =
             E.object [ ( "type", E.string "focus-element" ), ( "payload", E.string id ) ]
 
         SaveTodosList todos ->
-            E.object [ ( "type", E.string "save-todos" ), ( "payload", E.list encodeTodo todos ) ]
+            E.object [ ( "type", E.string "save-todos" ), ( "payload", E.list todoEncoder todos ) ]
 
         LogToConsole value ->
             case msg of
@@ -131,52 +131,45 @@ type TodoStatus
 
 
 -- should this be Maybe Todo?
-
-
-encodeTodo : Todo -> E.Value
-encodeTodo todo =
-    E.object
-        [ ( "id", E.string <| Uuid.toString todo.id )
-        , ( "createdAt", E.int (Time.posixToMillis todo.createdAt) )
-        , ( "title", E.string todo.title )
-        , ( "description", E.string todo.description )
-
-        -- , ( "status"
-        --   , case todo.status of
-        --         Complete date ->
-        --             E.object
-        --                 [ ( "status", E.string "complete" )
-        --                 , ( "date", E.int (Time.posixToMillis date) )
-        --                 ]
-        --         Incomplete ->
-        --             E.object [ ( "status", E.string "incomplete" ) ]
-        --   )
-        , ( "tasks", E.list encodeTodoTask (Maybe.withDefault [] todo.tasks) )
-        ]
-
-
-encodeTodoTask : TodoTask -> E.Value
-encodeTodoTask task =
-    E.object
-        [ ( "id", Uuid.encode task.id )
-        , ( "start"
-          , case task.start of
-                Just s ->
-                    E.int (Time.posixToMillis s)
-
-                Nothing ->
-                    E.null
-          )
-        , ( "end"
-          , case task.end of
-                Just s ->
-                    E.int (Time.posixToMillis s)
-
-                Nothing ->
-                    E.null
-          )
-        , ( "title", E.string task.title )
-        ]
+-- encodeTodo : Todo -> E.Value
+-- encodeTodo todo =
+--     E.object
+--         [ ( "id", E.string <| Uuid.toString todo.id )
+--         , ( "createdAt", E.int (Time.posixToMillis todo.createdAt) )
+--         , ( "title", E.string todo.title )
+--         , ( "description", E.string todo.description )
+--         -- , ( "status"
+--         --   , case todo.status of
+--         --         Complete date ->
+--         --             E.object
+--         --                 [ ( "status", E.string "complete" )
+--         --                 , ( "date", E.int (Time.posixToMillis date) )
+--         --                 ]
+--         --         Incomplete ->
+--         --             E.object [ ( "status", E.string "incomplete" ) ]
+--         --   )
+--         , ( "tasks", E.list encodeTodoTask (Maybe.withDefault [] todo.tasks) )
+--         ]
+-- encodeTodoTask : TodoTask -> E.Value
+-- encodeTodoTask task =
+--     E.object
+--         [ ( "id", Uuid.encode task.id )
+--         , ( "start"
+--           , case task.start of
+--                 Just s ->
+--                     E.int (Time.posixToMillis s)
+--                 Nothing ->
+--                     E.null
+--           )
+--         , ( "end"
+--           , case task.end of
+--                 Just s ->
+--                     E.int (Time.posixToMillis s)
+--                 Nothing ->
+--                     E.null
+--           )
+--         , ( "title", E.string task.title )
+--         ]
 
 
 type alias FormData =
@@ -597,19 +590,20 @@ init flags =
 
 flagDecoder : D.Decoder { seed : Int, todos : List Todo }
 flagDecoder =
-    D.map2 Flags
-        (D.field "seed" D.int)
-        (D.field "todos" (D.list todoDecoder))
-
-
-intToPosixDecoder : D.Decoder Time.Posix
-intToPosixDecoder =
-    D.int
-        |> D.andThen
-            (\time -> D.succeed (Time.millisToPosix time))
+    D.succeed Flags
+        |> DP.required "seed" D.int
+        |> DP.required "todos" (D.list todoDecoder)
 
 
 
+-- D.map2 Flags
+--     (D.field "seed" D.int)
+--     (D.field "todos" (D.list todoDecoder))
+-- intToPosixDecoder : D.Decoder Time.Posix
+-- intToPosixDecoder =
+--     D.int
+--         |> D.andThen
+--             (\time -> D.succeed (Time.millisToPosix time))
 -- todoDecoder : D.Decoder Todo
 -- todoDecoder =
 --     D.succeed Todo
@@ -618,12 +612,10 @@ intToPosixDecoder =
 --         |> DP.required "title" D.string
 --         |> DP.required "description" D.string
 --         |> DP.optional "tasks" (D.list todoTaskDecoder) []
-
-
-todoTaskDecoder : D.Decoder TodoTask
-todoTaskDecoder =
-    D.succeed TodoTask
-        |> DP.required "id" Uuid.decoder
-        |> DP.required "title" D.string
-        |> DP.optional "start" (D.nullable intToPosixDecoder) Nothing
-        |> DP.optional "end" (D.nullable intToPosixDecoder) Nothing
+-- todoTaskDecoder : D.Decoder TodoTask
+-- todoTaskDecoder =
+--     D.succeed TodoTask
+--         |> DP.required "id" Uuid.decoder
+--         |> DP.required "title" D.string
+--         |> DP.optional "start" (D.nullable intToPosixDecoder) Nothing
+--         |> DP.optional "end" (D.nullable intToPosixDecoder) Nothing
