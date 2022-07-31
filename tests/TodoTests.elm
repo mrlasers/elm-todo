@@ -4,10 +4,11 @@ import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer, int, list, string)
 import Json.Decode as D exposing (decodeValue)
 import Json.Encode as E
-import Main exposing (todoDecoder)
+import Main
 import Random
 import Test exposing (..)
 import Time
+import Todo exposing (todoDecoder)
 import Uuid
 
 

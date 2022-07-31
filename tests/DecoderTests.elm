@@ -2,12 +2,13 @@ module DecoderTests exposing (..)
 
 import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer, int, list, string)
+import Html.Attributes exposing (title)
 import Json.Decode as D
 import Json.Encode as E
 import Random
 import Test exposing (..)
 import Time
-import Todo exposing (Todo, posixDecoder, todoDecoder, todoEncoder, todoTaskDecoder)
+import Todo exposing (Todo, TodoTask, posixDecoder, todoDecoder, todoEncoder, todoTaskDecoder)
 import Uuid exposing (Uuid)
 
 
@@ -20,15 +21,29 @@ makeUuid i =
 
 todoTests : Test
 todoTests =
-    fuzz3 int int string "decodes a todo" <|
-        \seed time text ->
-            Todo (makeUuid seed)
-                (Time.millisToPosix time)
-                text
-                text
-                |> todoEncoder
-                |> D.decodeValue todoDecoder
-                |> Expect.ok
+    describe "Todo"
+        [ fuzz3 int int string "decodes a todo" <|
+            \seed time text ->
+                Todo (makeUuid seed)
+                    (Time.millisToPosix time)
+                    text
+                    text
+                    Nothing
+                    |> todoEncoder
+                    |> D.decodeValue todoDecoder
+                    |> Expect.ok
+        , fuzz3 int int string "decodes a todo with task" <|
+            \seed time text ->
+                Todo (makeUuid seed)
+                    (Time.millisToPosix time)
+                    text
+                    text
+                    (Just [ TodoTask (makeUuid time) text Nothing Nothing ])
+                    |> todoEncoder
+                    |> D.decodeValue todoDecoder
+                    |> Result.map .title
+                    |> Expect.equal (Ok text)
+        ]
 
 
 todoTaskTests : Test

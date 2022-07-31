@@ -1,4 +1,4 @@
-port module Main exposing (main, todoDecoder)
+port module Main exposing (main)
 
 import Browser exposing (Document)
 import Browser.Events exposing (onKeyDown)
@@ -14,6 +14,7 @@ import Platform exposing (Task)
 import Random
 import Task
 import Time
+import Todo exposing (Todo, TodoTask, todoDecoder, todoEncoder)
 import Uuid exposing (Uuid, uuidGenerator)
 
 
@@ -128,23 +129,6 @@ type TodoStatus
     | Incomplete
 
 
-type alias TodoTask =
-    { id : Uuid
-    , title : String
-    , start : Maybe Time.Posix
-    , end : Maybe Time.Posix
-    }
-
-
-type alias Todo =
-    { id : Uuid
-    , createdAt : Time.Posix
-    , title : String
-    , description : String
-    , tasks : List TodoTask
-    }
-
-
 
 -- should this be Maybe Todo?
 
@@ -167,7 +151,7 @@ encodeTodo todo =
         --         Incomplete ->
         --             E.object [ ( "status", E.string "incomplete" ) ]
         --   )
-        , ( "tasks", E.list encodeTodoTask todo.tasks )
+        , ( "tasks", E.list encodeTodoTask (Maybe.withDefault [] todo.tasks) )
         ]
 
 
@@ -307,49 +291,45 @@ update msg model =
                     case action of
                         AddTask ->
                             model.todos
-                                |> List.map
-                                    (\todo ->
-                                        if todo.id == id then
-                                            { todo | tasks = todo.tasks ++ [ TodoTask (makeUuid model.seed) "Next Task" Nothing Nothing ] }
 
-                                        else
-                                            todo
-                                    )
-
+                        -- |> List.map
+                        --     (\todo ->
+                        --         if todo.id == id then
+                        --             { todo | tasks = todo.tasks ++ [ TodoTask (makeUuid model.seed) "Next Task" Nothing Nothing ] }
+                        --         else
+                        --             todo
+                        --     )
                         DeleteTask taskId ->
                             model.todos
-                                |> List.map
-                                    (\todo ->
-                                        if todo.id == id then
-                                            { todo | tasks = todo.tasks |> List.filter (\task -> task.id /= taskId) }
 
-                                        else
-                                            todo
-                                    )
-
+                        -- |> List.map
+                        --     (\todo ->
+                        --         if todo.id == id then
+                        --             { todo | tasks = todo.tasks |> List.filter (\task -> task.id /= taskId) }
+                        --         else
+                        --             todo
+                        --     )
                         UpdateTask taskId value ->
                             model.todos
-                                |> List.map
-                                    (\todo ->
-                                        if todo.id == id then
-                                            let
-                                                tasks =
-                                                    todo.tasks
-                                                        |> List.map
-                                                            (\task ->
-                                                                if task.id == taskId then
-                                                                    { task | title = value }
 
-                                                                else
-                                                                    task
-                                                            )
-                                            in
-                                            { todo | tasks = tasks }
-
-                                        else
-                                            todo
-                                    )
-
+                        -- |> List.map
+                        --     (\todo ->
+                        --         if todo.id == id then
+                        --             let
+                        --                 tasks =
+                        --                     todo.tasks
+                        --                         |> List.map
+                        --                             (\task ->
+                        --                                 if task.id == taskId then
+                        --                                     { task | title = value }
+                        --                                 else
+                        --                                     task
+                        --                             )
+                        --             in
+                        --             { todo | tasks = tasks }
+                        --         else
+                        --             todo
+                        --     )
                         _ ->
                             model.todos
             in
@@ -421,7 +401,7 @@ update msg model =
                         []
 
                     todos =
-                        Todo (Maybe.withDefault (makeUuid model.seed) (Just id)) model.time.now title description [] :: model.todos
+                        Todo (Maybe.withDefault (makeUuid model.seed) (Just id)) model.time.now title description Nothing :: model.todos
                 in
                 ( { model | todos = todos, form = FormData Nothing "" "" [] }
                 , Cmd.batch [ messageFromElm (encodeMessage (SaveTodosList todos)), generateNewSeed ]
@@ -629,14 +609,15 @@ intToPosixDecoder =
             (\time -> D.succeed (Time.millisToPosix time))
 
 
-todoDecoder : D.Decoder Todo
-todoDecoder =
-    D.succeed Todo
-        |> DP.required "id" Uuid.decoder
-        |> DP.required "createdAt" intToPosixDecoder
-        |> DP.required "title" D.string
-        |> DP.required "description" D.string
-        |> DP.optional "tasks" (D.list todoTaskDecoder) []
+
+-- todoDecoder : D.Decoder Todo
+-- todoDecoder =
+--     D.succeed Todo
+--         |> DP.required "id" Uuid.decoder
+--         |> DP.required "createdAt" intToPosixDecoder
+--         |> DP.required "title" D.string
+--         |> DP.required "description" D.string
+--         |> DP.optional "tasks" (D.list todoTaskDecoder) []
 
 
 todoTaskDecoder : D.Decoder TodoTask
@@ -646,11 +627,3 @@ todoTaskDecoder =
         |> DP.required "title" D.string
         |> DP.optional "start" (D.nullable intToPosixDecoder) Nothing
         |> DP.optional "end" (D.nullable intToPosixDecoder) Nothing
-
-
-
--- todoStatusDecoder : D.Decoder TodoStatusJson
--- todoStatusDecoder =
---     D.succeed TodoStatusJson
---         |> DP.required "status" D.string
---         |> DP.optional "date" (D.maybe D.int) Nothing

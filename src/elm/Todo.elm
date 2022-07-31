@@ -12,6 +12,7 @@ type alias Todo =
     , createdAt : Posix
     , title : String
     , description : String
+    , tasks : Maybe (List TodoTask)
     }
 
 
@@ -27,6 +28,9 @@ todoDecoder =
         |> required "createdAt" posixDecoder
         |> required "title" D.string
         |> required "description" D.string
+        |> optional "tasks"
+            (D.nullable <| D.list todoTaskDecoder)
+            Nothing
 
 
 todoEncoder : Todo -> E.Value
