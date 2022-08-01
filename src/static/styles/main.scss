@@ -244,3 +244,20 @@ form.new-task {
 //     }
 //   }
 // }
+
+.jobs {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+
+  li {
+    padding: 0.5em;
+  }
+}
+
+.shit {
+  background-color: brown;
+  color: whitesmoke;
+  padding: 0.5em;
+}

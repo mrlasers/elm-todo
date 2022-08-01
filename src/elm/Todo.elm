@@ -44,6 +44,26 @@ projectEncoder =
             ]
 
 
+
+-- type JobOfWork
+--     = NewJob String Uuid
+--     | StartedJob String Uuid Posix
+--     | CompletedJob String Uuid Posix Posix Int
+
+
+type JobOfWork
+    = NewJob String
+    | StartedJob String Posix
+    | CompletedJob String Posix Posix Int
+
+
+
+-- type Todo
+--     = Unstarted Uuid
+--     | Started Uuid Posix
+--     | Complete Uuid Posix Posix Int
+
+
 type alias Todo =
     { id : Uuid
     , title : String

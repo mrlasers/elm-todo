@@ -16,7 +16,7 @@ buildUuid integer =
         initialSeed =
             Random.initialSeed integer
 
-        ( uuid, seed ) =
+        ( uuid, _ ) =
             Random.step Uuid.uuidGenerator initialSeed
     in
     uuid

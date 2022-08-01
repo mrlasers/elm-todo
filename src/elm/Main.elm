@@ -14,7 +14,7 @@ import Platform exposing (Task)
 import Random
 import Task
 import Time
-import Todo exposing (Project, Todo, projectDecoder, projectEncoder)
+import Todo exposing (JobOfWork(..), Project, Todo, projectDecoder, projectEncoder)
 import Uuid exposing (Uuid, uuidGenerator)
 
 
@@ -109,8 +109,22 @@ decodeReceivedPayload { type_, payload } =
 -- MODEL
 
 
+diffTimesInMinutes : Time.Posix -> Time.Posix -> Int
+diffTimesInMinutes start end =
+    (Time.posixToMillis end - Time.posixToMillis start)
+        // 1000
+
+
+
+-- // 60
+-- 2
+
+
 type alias Model =
     { seed : Random.Seed
+    , jobs : List JobOfWork
+    , newJob : String
+    , selectedJob : Maybe JobOfWork
     , todos : List Project
     , filteredTodos : List Project
     , todoView : TodoView
@@ -248,6 +262,9 @@ type Msg
     | Send SendPortMessage
     | Tick Time.Posix
     | AdjustTimeZone Time.Zone
+    | AddNewJob
+    | UpdateNewJob String
+    | SelectJob JobOfWork
 
 
 type TodoUpdate
@@ -262,6 +279,53 @@ update msg model =
     case msg of
         Noop ->
             ( model, Cmd.none )
+
+        AddNewJob ->
+            ( { model | newJob = "", jobs = NewJob model.newJob :: model.jobs }, Cmd.none )
+
+        SelectJob job ->
+            let
+                selectedJob =
+                    case job of
+                        NewJob str ->
+                            StartedJob str model.time.now
+
+                        StartedJob str start ->
+                            CompletedJob str start model.time.now (diffTimesInMinutes start model.time.now)
+
+                        CompletedJob _ _ _ _ ->
+                            job
+
+                newJobs =
+                    model.jobs
+                        |> List.map
+                            (\j ->
+                                if j == job then
+                                    selectedJob
+
+                                else
+                                    case j of
+                                        StartedJob title start ->
+                                            CompletedJob title start model.time.now (diffTimesInMinutes start model.time.now)
+
+                                        _ ->
+                                            j
+                            )
+            in
+            ( { model
+                | selectedJob =
+                    if model.selectedJob == Just selectedJob then
+                        Nothing
+
+                    else
+                        Just job
+                , jobs = newJobs
+              }
+            , Cmd.none
+            )
+
+        UpdateNewJob str ->
+            ( { model | newJob = str }, Cmd.none )
 
         Tick newTime ->
             ( model.time
@@ -448,11 +512,48 @@ onClickToFocus =
     onClick << Send << FocusInputById
 
 
+type SomeShit
+    = SomeText String
+
+
 view : Model -> Document Msg
 view model =
     { title = "Tasks.TimothyPew_com"
     , body =
         [ viewHeader model
+        , div []
+            [ Html.form [ onSubmit AddNewJob ]
+                [ input
+                    [ onInput UpdateNewJob
+                    , value model.newJob
+                    ]
+                    []
+                , button [] [ text "Add shit" ]
+                ]
+            , ul [ class "jobs" ]
+                (model.jobs
+                    |> List.map
+                        (\job ->
+                            let
+                                className =
+                                    if Just job == model.selectedJob then
+                                        "shit"
+
+                                    else
+                                        ""
+                            in
+                            case job of
+                                NewJob str ->
+                                    li [ class className, onClick <| SelectJob job ] [ text <| "NewJob: " ++ str ]
+
+                                StartedJob str start ->
+                                    li [ class className, onClick <| SelectJob job ] [ text <| "Running job: " ++ str ++ " (" ++ (String.fromInt <| diffTimesInMinutes start model.time.now) ++ "s)" ]
+
+                                CompletedJob str _ _ duration ->
+                                    li [ class className, onClick <| SelectJob job ] [ text <| "Completed job: " ++ str ++ " (total time: " ++ String.fromInt duration ++ "s)" ]
+                        )
+                )
+            ]
         , main_ []
             [ div [] [ text "put editor here" ]
             , Html.form [ class "new-task", onSubmit AddTodo ]
@@ -580,6 +681,9 @@ init flags =
                     }
       in
       { seed = seed
+      , newJob = ""
+      , selectedJob = Nothing
+      , jobs = []
       , todos = todos
       , filteredTodos = todos
       , editing = Nothing
