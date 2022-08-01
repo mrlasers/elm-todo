@@ -13,7 +13,7 @@ import List
 import Platform exposing (Task)
 import Random
 import Task
-import Time
+import Time exposing (Posix)
 import Todo exposing (JobOfWork(..), Project, Todo, projectDecoder, projectEncoder)
 import Uuid exposing (Uuid, uuidGenerator)
 
@@ -115,16 +115,18 @@ diffTimesInMinutes start end =
         // 1000
 
 
-
--- // 60
--- 2
+type alias JobsThing =
+    { jobs : List JobOfWork
+    , newJob : String
+    , selectedJob : Maybe JobOfWork
+    }
 
 
 type alias Model =
     { seed : Random.Seed
-    , jobs : List JobOfWork
-    , newJob : String
-    , selectedJob : Maybe JobOfWork
+    , randomInt : Int
+    , jobsThing :
+        JobsThing
     , todos : List Project
     , filteredTodos : List Project
     , todoView : TodoView
@@ -141,49 +143,6 @@ type alias Model =
 type TodoStatus
     = Complete Time.Posix
     | Incomplete
-
-
-
--- should this be Maybe Todo?
--- encodeTodo : Todo -> E.Value
--- encodeTodo todo =
---     E.object
---         [ ( "id", E.string <| Uuid.toString todo.id )
---         , ( "createdAt", E.int (Time.posixToMillis todo.createdAt) )
---         , ( "title", E.string todo.title )
---         , ( "description", E.string todo.description )
---         -- , ( "status"
---         --   , case todo.status of
---         --         Complete date ->
---         --             E.object
---         --                 [ ( "status", E.string "complete" )
---         --                 , ( "date", E.int (Time.posixToMillis date) )
---         --                 ]
---         --         Incomplete ->
---         --             E.object [ ( "status", E.string "incomplete" ) ]
---         --   )
---         , ( "tasks", E.list encodeTodoTask (Maybe.withDefault [] todo.tasks) )
---         ]
--- encodeTodoTask : TodoTask -> E.Value
--- encodeTodoTask task =
---     E.object
---         [ ( "id", Uuid.encode task.id )
---         , ( "start"
---           , case task.start of
---                 Just s ->
---                     E.int (Time.posixToMillis s)
---                 Nothing ->
---                     E.null
---           )
---         , ( "end"
---           , case task.end of
---                 Just s ->
---                     E.int (Time.posixToMillis s)
---                 Nothing ->
---                     E.null
---           )
---         , ( "title", E.string task.title )
---         ]
 
 
 type alias FormData =
@@ -217,8 +176,8 @@ todoViewToString style =
 
 
 makeUuid : Random.Seed -> Uuid
-makeUuid seed =
-    seed |> Random.step uuidGenerator |> Tuple.first
+makeUuid =
+    Random.step uuidGenerator >> Tuple.first
 
 
 makeFormattedTimeString : { now : Time.Posix, zone : Time.Zone } -> String
@@ -262,9 +221,8 @@ type Msg
     | Send SendPortMessage
     | Tick Time.Posix
     | AdjustTimeZone Time.Zone
-    | AddNewJob
-    | UpdateNewJob String
-    | SelectJob JobOfWork
+    | UpdateRandomInt Int
+    | UpdateJobs JobsMsg
 
 
 type TodoUpdate
@@ -274,24 +232,37 @@ type TodoUpdate
     | DeleteTask Uuid
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case msg of
-        Noop ->
-            ( model, Cmd.none )
+randomInt : Random.Generator Int
+randomInt =
+    Random.int Random.minInt Random.maxInt
 
+
+type JobsMsg
+    = AddNewJob
+    | UpdateNewJob String
+    | SelectJob JobOfWork
+
+
+updateJobsThing : Posix -> JobsMsg -> JobsThing -> ( JobsThing, Cmd Msg )
+updateJobsThing currentTime msg model =
+    case msg of
         AddNewJob ->
-            ( { model | newJob = "", jobs = NewJob model.newJob :: model.jobs }, Cmd.none )
+            ( { model
+                | jobs = NewJob model.newJob :: model.jobs
+                , newJob = ""
+              }
+            , Cmd.none
+            )
 
         SelectJob job ->
             let
                 selectedJob =
                     case job of
                         NewJob str ->
-                            StartedJob str model.time.now
+                            StartedJob str currentTime
 
                         StartedJob str start ->
-                            CompletedJob str start model.time.now (diffTimesInMinutes start model.time.now)
+                            CompletedJob str start currentTime (diffTimesInMinutes start currentTime)
 
                         CompletedJob _ _ _ _ ->
                             job
@@ -306,26 +277,42 @@ update msg model =
                                 else
                                     case j of
                                         StartedJob title start ->
-                                            CompletedJob title start model.time.now (diffTimesInMinutes start model.time.now)
+                                            CompletedJob title start currentTime <| diffTimesInMinutes start currentTime
 
                                         _ ->
                                             j
                             )
-            in
-            ( { model
-                | selectedJob =
+
+                newSelectedJob =
                     if model.selectedJob == Just selectedJob then
                         Nothing
 
                     else
-                        Just job
-                , jobs = newJobs
+                        Just selectedJob
+            in
+            ( { model
+                | jobs = newJobs
+                , selectedJob = newSelectedJob
               }
             , Cmd.none
             )
 
-        UpdateNewJob str ->
-            ( { model | newJob = str }, Cmd.none )
+        UpdateNewJob jobTitle ->
+            ( { model | newJob = jobTitle }, Cmd.none )
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+        Noop ->
+            ( model, Cmd.none )
+
+        UpdateJobs jobsMsg ->
+            updateJobsThing model.time.now jobsMsg model.jobsThing
+                |> (\( jobsThing, cmd ) -> ( { model | jobsThing = jobsThing }, cmd ))
+
+        UpdateRandomInt int ->
+            ( { model | randomInt = int }, Cmd.none )
 
         Tick newTime ->
             ( model.time
@@ -499,7 +486,7 @@ update msg model =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.batch [ messageReceiver Recv, Time.every 1000 Tick ]
+    Sub.batch [ messageReceiver Recv, Time.every 100 Tick ]
 
 
 generateNewSeed : Cmd Msg
@@ -512,48 +499,12 @@ onClickToFocus =
     onClick << Send << FocusInputById
 
 
-type SomeShit
-    = SomeText String
-
-
 view : Model -> Document Msg
 view model =
     { title = "Tasks.TimothyPew_com"
     , body =
         [ viewHeader model
-        , div []
-            [ Html.form [ onSubmit AddNewJob ]
-                [ input
-                    [ onInput UpdateNewJob
-                    , value model.newJob
-                    ]
-                    []
-                , button [] [ text "Add shit" ]
-                ]
-            , ul [ class "jobs" ]
-                (model.jobs
-                    |> List.map
-                        (\job ->
-                            let
-                                className =
-                                    if Just job == model.selectedJob then
-                                        "shit"
-
-                                    else
-                                        ""
-                            in
-                            case job of
-                                NewJob str ->
-                                    li [ class className, onClick <| SelectJob job ] [ text <| "NewJob: " ++ str ]
-
-                                StartedJob str start ->
-                                    li [ class className, onClick <| SelectJob job ] [ text <| "Running job: " ++ str ++ " (" ++ (String.fromInt <| diffTimesInMinutes start model.time.now) ++ "s)" ]
-
-                                CompletedJob str _ _ duration ->
-                                    li [ class className, onClick <| SelectJob job ] [ text <| "Completed job: " ++ str ++ " (total time: " ++ String.fromInt duration ++ "s)" ]
-                        )
-                )
-            ]
+        , viewJobsThing model.jobsThing model.time.now
         , main_ []
             [ div [] [ text "put editor here" ]
             , Html.form [ class "new-task", onSubmit AddTodo ]
@@ -602,6 +553,44 @@ view model =
         , viewFooter model
         ]
     }
+
+
+viewJobsThing : JobsThing -> Posix -> Html Msg
+viewJobsThing model currentTime =
+    div []
+        [ Html.form [ onSubmit (UpdateJobs AddNewJob) ]
+            [ input
+                [ onInput
+                    (UpdateNewJob >> UpdateJobs)
+                , value model.newJob
+                ]
+                []
+            , button [] [ text "Add shit" ]
+            ]
+        , ul [ class "jobs" ]
+            (model.jobs
+                |> List.map
+                    (\job ->
+                        let
+                            className =
+                                if Just job == model.selectedJob then
+                                    "shit"
+
+                                else
+                                    ""
+                        in
+                        case job of
+                            NewJob str ->
+                                li [ class className, onClick (UpdateJobs <| SelectJob job) ] [ text <| "NewJob: " ++ str ]
+
+                            StartedJob str start ->
+                                li [ class className, onClick (UpdateJobs <| SelectJob job) ] [ text <| "Running job: " ++ str ++ " (" ++ (String.fromInt <| diffTimesInMinutes start currentTime) ++ "s)" ]
+
+                            CompletedJob str _ _ duration ->
+                                li [ class className, onClick (UpdateJobs <| SelectJob job) ] [ text <| "Completed job: " ++ str ++ " (total time: " ++ String.fromInt duration ++ "s)" ]
+                    )
+            )
+        ]
 
 
 viewHeader : Model -> Html Msg
@@ -681,9 +670,12 @@ init flags =
                     }
       in
       { seed = seed
-      , newJob = ""
-      , selectedJob = Nothing
-      , jobs = []
+      , randomInt = 0
+      , jobsThing =
+            { newJob = ""
+            , selectedJob = Nothing
+            , jobs = []
+            }
       , todos = todos
       , filteredTodos = todos
       , editing = Nothing
@@ -704,29 +696,3 @@ flagsDecoder =
     D.succeed Flags
         |> DP.required "seed" D.int
         |> DP.required "todos" (D.list projectDecoder)
-
-
-
--- D.map2 Flags
---     (D.field "seed" D.int)
---     (D.field "todos" (D.list todoDecoder))
--- intToPosixDecoder : D.Decoder Time.Posix
--- intToPosixDecoder =
---     D.int
---         |> D.andThen
---             (\time -> D.succeed (Time.millisToPosix time))
--- todoDecoder : D.Decoder Todo
--- todoDecoder =
---     D.succeed Todo
---         |> DP.required "id" Uuid.decoder
---         |> DP.required "createdAt" intToPosixDecoder
---         |> DP.required "title" D.string
---         |> DP.required "description" D.string
---         |> DP.optional "tasks" (D.list todoTaskDecoder) []
--- todoTaskDecoder : D.Decoder TodoTask
--- todoTaskDecoder =
---     D.succeed TodoTask
---         |> DP.required "id" Uuid.decoder
---         |> DP.required "title" D.string
---         |> DP.optional "start" (D.nullable intToPosixDecoder) Nothing
---         |> DP.optional "end" (D.nullable intToPosixDecoder) Nothing
