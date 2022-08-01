@@ -7,7 +7,7 @@ import Json.Encode as E
 import Random
 import Test exposing (..)
 import Time
-import Todo exposing (todoDecoder)
+import Todo exposing (projectDecoder)
 import Uuid
 
 
@@ -45,6 +45,6 @@ todoTests =
             , ( "tasks", E.list E.string [] )
             ]
                 |> E.object
-                |> decodeValue todoDecoder
+                |> decodeValue projectDecoder
                 |> Result.map .title
                 |> Expect.equal (Ok title)

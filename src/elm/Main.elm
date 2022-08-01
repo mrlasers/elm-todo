@@ -14,7 +14,7 @@ import Platform exposing (Task)
 import Random
 import Task
 import Time
-import Todo exposing (Todo, TodoTask, todoDecoder, todoEncoder)
+import Todo exposing (Project, Todo, projectDecoder, projectEncoder)
 import Uuid exposing (Uuid, uuidGenerator)
 
 
@@ -49,7 +49,7 @@ encodeMessage msg =
             E.object [ ( "type", E.string "focus-element" ), ( "payload", E.string id ) ]
 
         SaveTodosList todos ->
-            E.object [ ( "type", E.string "save-todos" ), ( "payload", E.list todoEncoder todos ) ]
+            E.object [ ( "type", E.string "save-todos" ), ( "payload", E.list projectEncoder todos ) ]
 
         LogToConsole value ->
             case msg of
@@ -59,7 +59,7 @@ encodeMessage msg =
 
 type SendPortMessage
     = FocusInputById String
-    | SaveTodosList (List Todo)
+    | SaveTodosList (List Project)
     | LogToConsole E.Value
 
 
@@ -111,8 +111,8 @@ decodeReceivedPayload { type_, payload } =
 
 type alias Model =
     { seed : Random.Seed
-    , todos : List Todo
-    , filteredTodos : List Todo
+    , todos : List Project
+    , filteredTodos : List Project
     , todoView : TodoView
     , editing : Maybe Uuid
     , form : FormData
@@ -176,7 +176,7 @@ type alias FormData =
     { id : Maybe Uuid
     , title : String
     , description : String
-    , tasks : List TodoTask
+    , tasks : List Todo
     }
 
 
@@ -366,7 +366,7 @@ update msg model =
                         title =
                             "Untitled Task"
                     in
-                    ( { model | form = { form | tasks = [ TodoTask id title start end ] } }, generateNewSeed )
+                    ( { model | form = { form | tasks = [ Todo id title start end ] } }, generateNewSeed )
 
         SetDisplayType viewType ->
             ( { model | todoView = viewType }, Cmd.none )
@@ -398,7 +398,7 @@ update msg model =
                             Just model.form.tasks
 
                     todos =
-                        Todo (Maybe.withDefault (makeUuid model.seed) (Just id)) model.time.now title description tasks :: model.todos
+                        Project (Maybe.withDefault (makeUuid model.seed) (Just id)) model.time.now Nothing title description tasks :: model.todos
                 in
                 ( { model | todos = todos, form = FormData Nothing "" "" [] }
                 , Cmd.batch [ messageFromElm (encodeMessage (SaveTodosList todos)), generateNewSeed ]
@@ -535,8 +535,8 @@ viewFooter model =
         ]
 
 
-viewTodoItem : Maybe Uuid -> Todo -> Html Msg
-viewTodoItem editing { title, id, description, tasks } =
+viewTodoItem : Maybe Uuid -> Project -> Html Msg
+viewTodoItem editing { title, id, description, todos } =
     let
         isEditing =
             case editing of
@@ -556,7 +556,7 @@ viewTodoItem editing { title, id, description, tasks } =
             , div [ class "id" ] [ text <| Uuid.toString id ]
             , span [ class "delete", onClick (DeleteTodo id) ] [ text "❌" ]
             , div []
-                (case tasks of
+                (case todos of
                     Nothing ->
                         [ text "No tasks" ]
 
@@ -567,7 +567,7 @@ viewTodoItem editing { title, id, description, tasks } =
 
 
 type alias Flags =
-    { seed : Int, todos : List Todo }
+    { seed : Int, todos : List Project }
 
 
 init : E.Value -> ( Model, Cmd Msg )
@@ -601,11 +601,11 @@ init flags =
     )
 
 
-flagsDecoder : D.Decoder { seed : Int, todos : List Todo }
+flagsDecoder : D.Decoder { seed : Int, todos : List Project }
 flagsDecoder =
     D.succeed Flags
         |> DP.required "seed" D.int
-        |> DP.required "todos" (D.list todoDecoder)
+        |> DP.required "todos" (D.list projectDecoder)
 
 
 

@@ -9,7 +9,7 @@ import Main exposing (flagsDecoder)
 import Random
 import Test exposing (..)
 import Time
-import Todo exposing (Todo, TodoTask, posixDecoder, todoDecoder, todoEncoder, todoTaskDecoder, todosDecoder)
+import Todo exposing (Project, Todo, posixDecoder, projectDecoder, projectEncoder, todoDecoder)
 import Uuid exposing (Uuid)
 
 
@@ -40,27 +40,29 @@ todoTests =
                 """
                 [{"id":"9141f1ca-8740-4b88-a8f4-c138fc19772d","createdAt":1659260320055,"title":"Goodnight, Moon.","description":"The End."},{"id":"1c4e3106-69d7-4020-97d3-9dccd3b8abc3","createdAt":1659260308047,"title":"Hello, World!","description":"He was a dark and stormy knight..."}]
                 """
-                    |> D.decodeString todosDecoder
+                    |> D.decodeString (D.list projectDecoder)
                     |> Expect.ok
         , fuzz3 int int string "decodes a todo" <|
             \seed time text ->
-                Todo (makeUuid seed)
+                Project (makeUuid seed)
                     (Time.millisToPosix time)
+                    Nothing
                     text
                     text
                     Nothing
-                    |> todoEncoder
-                    |> D.decodeValue todoDecoder
+                    |> projectEncoder
+                    |> D.decodeValue projectDecoder
                     |> Expect.ok
         , fuzz3 int int string "decodes a todo with task" <|
             \seed time text ->
-                Todo (makeUuid seed)
+                Project (makeUuid seed)
                     (Time.millisToPosix time)
+                    Nothing
                     text
                     text
-                    (Just [ TodoTask (makeUuid time) text Nothing Nothing ])
-                    |> todoEncoder
-                    |> D.decodeValue todoDecoder
+                    (Just [ Todo (makeUuid time) text Nothing Nothing ])
+                    |> projectEncoder
+                    |> D.decodeValue projectDecoder
                     |> Result.map .title
                     |> Expect.equal (Ok text)
         ]
@@ -72,29 +74,29 @@ todoTaskTests =
         [ test "decodes" <| \_ -> Expect.equal 2 2
         , fuzz2 int string "decodes todotask with no dates" <|
             \seed title ->
-                Todo.TodoTask (makeUuid seed) title Nothing Nothing
-                    |> Todo.todoTaskEncoder
-                    |> D.decodeValue todoTaskDecoder
+                Todo (makeUuid seed) title Nothing Nothing
+                    |> Todo.todoEncoder
+                    |> D.decodeValue todoDecoder
                     |> Result.map .title
                     |> Expect.equal (Ok title)
         , fuzz3 int int string "decodes todotask wtih start date" <|
             \seed time title ->
-                Todo.TodoTask (makeUuid seed)
+                Todo (makeUuid seed)
                     title
                     (time |> Just << Time.millisToPosix)
                     Nothing
-                    |> Todo.todoTaskEncoder
-                    |> D.decodeValue todoTaskDecoder
+                    |> Todo.todoEncoder
+                    |> D.decodeValue todoDecoder
                     |> Result.map .title
                     |> Expect.equal (Ok title)
         , fuzz3 int int string "decodes todotask with start & end dates" <|
             \seed time title ->
-                Todo.TodoTask (makeUuid seed)
+                Todo (makeUuid seed)
                     title
                     (time |> Just << Time.millisToPosix)
                     (time + seed |> Just << Time.millisToPosix)
-                    |> Todo.todoTaskEncoder
-                    |> D.decodeValue todoTaskDecoder
+                    |> Todo.todoEncoder
+                    |> D.decodeValue todoDecoder
                     |> Result.map .title
                     |> Expect.equal (Ok title)
         ]

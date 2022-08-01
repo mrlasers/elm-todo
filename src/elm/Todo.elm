@@ -7,39 +7,36 @@ import Time exposing (Posix)
 import Uuid exposing (Uuid)
 
 
-type alias Todo =
-    { id : Uuid
-    , createdAt : Posix
-    , title : String
-    , description : String
-    , tasks : Maybe (List TodoTask)
-    }
-
-
 posixDecoder : D.Decoder Posix
 posixDecoder =
     D.int |> D.andThen (\time -> D.succeed (Time.millisToPosix time))
 
 
-todosDecoder : D.Decoder (List Todo)
-todosDecoder =
-    D.list todoDecoder
+type alias Project =
+    { id : Uuid
+    , createdAt : Posix
+    , completedAt : Maybe Posix
+    , title : String
+    , description : String
+    , todos : Maybe (List Todo)
+    }
 
 
-todoDecoder : D.Decoder Todo
-todoDecoder =
-    D.succeed Todo
+projectDecoder : D.Decoder Project
+projectDecoder =
+    D.succeed Project
         |> required "id" Uuid.decoder
         |> required "createdAt" posixDecoder
+        |> optional "completedAt" (D.nullable <| posixDecoder) Nothing
         |> required "title" D.string
         |> required "description" D.string
         |> optional "tasks"
-            (D.nullable <| D.list todoTaskDecoder)
+            (D.nullable <| D.list todoDecoder)
             Nothing
 
 
-todoEncoder : Todo -> E.Value
-todoEncoder =
+projectEncoder : Project -> E.Value
+projectEncoder =
     \todo ->
         E.object <|
             [ ( "id", Uuid.encode todo.id )
@@ -49,7 +46,7 @@ todoEncoder =
             ]
 
 
-type alias TodoTask =
+type alias Todo =
     { id : Uuid
     , title : String
     , start : Maybe Time.Posix
@@ -57,30 +54,43 @@ type alias TodoTask =
     }
 
 
-type alias TodoTaskRange =
-    ( Maybe Posix, Maybe Posix, Maybe Int )
+
+-- todoTaskDecoder : D.Decoder TodoTask
+-- todoTaskDecoder =
+--     D.succeed TodoTask
+--         |> required "title" D.string
 
 
-todoTaskDecoder : D.Decoder TodoTask
-todoTaskDecoder =
-    D.succeed TodoTask
+type alias TodoTask =
+    { title : String
+    , time :
+        { start : Maybe Posix
+        , end : Maybe Posix
+        , total : Maybe Int
+        }
+    }
+
+
+todoDecoder : D.Decoder Todo
+todoDecoder =
+    D.succeed Todo
         |> required "id" Uuid.decoder
         |> required "title" D.string
         |> optional "start" (D.nullable posixDecoder) Nothing
         |> optional "end" (D.nullable posixDecoder) Nothing
 
 
-todoTaskEncoder : TodoTask -> E.Value
-todoTaskEncoder task =
+todoEncoder : Todo -> E.Value
+todoEncoder todo =
     E.object <|
-        [ ( "id", Uuid.encode task.id )
-        , ( "title", E.string task.title )
+        [ ( "id", Uuid.encode todo.id )
+        , ( "title", E.string todo.title )
         , ( "start"
-          , (Maybe.map (Time.posixToMillis >> E.int) <| task.start)
+          , (Maybe.map (Time.posixToMillis >> E.int) <| todo.start)
                 |> Maybe.withDefault E.null
           )
         , ( "end"
-          , (Maybe.map (Time.posixToMillis >> E.int) <| task.end)
+          , (Maybe.map (Time.posixToMillis >> E.int) <| todo.end)
                 |> Maybe.withDefault E.null
           )
         ]
