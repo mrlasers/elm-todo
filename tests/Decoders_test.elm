@@ -1,4 +1,4 @@
-module DecoderTests exposing (..)
+module Decoders_test exposing (..)
 
 import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer, int, list, string)
@@ -9,7 +9,7 @@ import Main exposing (flagsDecoder)
 import Random
 import Test exposing (..)
 import Time
-import Todo exposing (Project, Todo, posixDecoder, projectDecoder, projectEncoder, todoDecoder)
+import Todo exposing (Job, Project, Todo, jobEncoder, newJobDecoder, posixDecoder, projectDecoder, projectEncoder, todoDecoder)
 import Uuid exposing (Uuid)
 
 
@@ -32,13 +32,25 @@ flagsTests =
                 |> Expect.ok
 
 
-todoTests : Test
-todoTests =
-    describe "Todo"
-        [ test "decodes some todos in a list" <|
+projectTests : Test
+projectTests =
+    describe "Project"
+        [ test "decodes some projects in a list" <|
             \_ ->
                 """
-                [{"id":"9141f1ca-8740-4b88-a8f4-c138fc19772d","createdAt":1659260320055,"title":"Goodnight, Moon.","description":"The End."},{"id":"1c4e3106-69d7-4020-97d3-9dccd3b8abc3","createdAt":1659260308047,"title":"Hello, World!","description":"He was a dark and stormy knight..."}]
+                [{
+                    "id": "9141f1ca-8740-4b88-a8f4-c138fc19772d",
+                    "createdAt": 1659260320055,
+                    "title": "Goodnight, Moon.",
+                    "description": "The End.",
+                    "todos": []
+                },
+                {
+                    "id": "1c4e3106-69d7-4020-97d3-9dccd3b8abc3",
+                    "createdAt": 1659260308047,
+                    "title": "Hello, World!",
+                    "description": "He was a dark and stormy knight..."
+                }]
                 """
                     |> D.decodeString (D.list projectDecoder)
                     |> Expect.ok
@@ -68,18 +80,30 @@ todoTests =
         ]
 
 
-todoTaskTests : Test
-todoTaskTests =
-    describe "TodoTask Decoders"
+jobTests : Test
+jobTests =
+    describe "Job"
+        [ fuzz2 int string "Decodes a job" <|
+            \seed title ->
+                Todo.NewJob (makeUuid seed) title
+                    |> jobEncoder
+                    |> D.decodeValue Todo.jobDecoder
+                    |> Expect.ok
+        ]
+
+
+todoTests : Test
+todoTests =
+    describe "Todo"
         [ test "decodes" <| \_ -> Expect.equal 2 2
-        , fuzz2 int string "decodes todotask with no dates" <|
+        , fuzz2 int string "decodes todo with no dates" <|
             \seed title ->
                 Todo (makeUuid seed) title Nothing Nothing
                     |> Todo.todoEncoder
                     |> D.decodeValue todoDecoder
                     |> Result.map .title
                     |> Expect.equal (Ok title)
-        , fuzz3 int int string "decodes todotask wtih start date" <|
+        , fuzz3 int int string "decodes todo wtih start date" <|
             \seed time title ->
                 Todo (makeUuid seed)
                     title
@@ -89,7 +113,7 @@ todoTaskTests =
                     |> D.decodeValue todoDecoder
                     |> Result.map .title
                     |> Expect.equal (Ok title)
-        , fuzz3 int int string "decodes todotask with start & end dates" <|
+        , fuzz3 int int string "decodes todo with start & end dates" <|
             \seed time title ->
                 Todo (makeUuid seed)
                     title

@@ -14,7 +14,7 @@ import Platform exposing (Task)
 import Random
 import Task
 import Time exposing (Posix)
-import Todo exposing (JobOfWork(..), Project, Todo, projectDecoder, projectEncoder)
+import Todo exposing (Job(..), Project, Todo, projectDecoder, projectEncoder)
 import Uuid exposing (Uuid, uuidGenerator)
 
 
@@ -116,9 +116,9 @@ diffTimesInMinutes start end =
 
 
 type alias JobsThing =
-    { jobs : List JobOfWork
+    { jobs : List Job
     , newJob : String
-    , selectedJob : Maybe JobOfWork
+    , selectedJob : Maybe Job
     }
 
 
@@ -222,7 +222,9 @@ type Msg
     | Tick Time.Posix
     | AdjustTimeZone Time.Zone
     | UpdateRandomInt Int
-    | UpdateJobs JobsMsg
+    | AddNewJob
+    | UpdateNewJob String
+    | SelectJob Job
 
 
 type TodoUpdate
@@ -237,79 +239,95 @@ randomInt =
     Random.int Random.minInt Random.maxInt
 
 
-type JobsMsg
-    = AddNewJob
-    | UpdateNewJob String
-    | SelectJob JobOfWork
-
-
-updateJobsThing : Posix -> JobsMsg -> JobsThing -> ( JobsThing, Cmd Msg )
-updateJobsThing currentTime msg model =
-    case msg of
-        AddNewJob ->
-            ( { model
-                | jobs = NewJob model.newJob :: model.jobs
-                , newJob = ""
-              }
-            , Cmd.none
-            )
-
-        SelectJob job ->
-            let
-                selectedJob =
-                    case job of
-                        NewJob str ->
-                            StartedJob str currentTime
-
-                        StartedJob str start ->
-                            CompletedJob str start currentTime (diffTimesInMinutes start currentTime)
-
-                        CompletedJob _ _ _ _ ->
-                            job
-
-                newJobs =
-                    model.jobs
-                        |> List.map
-                            (\j ->
-                                if j == job then
-                                    selectedJob
-
-                                else
-                                    case j of
-                                        StartedJob title start ->
-                                            CompletedJob title start currentTime <| diffTimesInMinutes start currentTime
-
-                                        _ ->
-                                            j
-                            )
-
-                newSelectedJob =
-                    if model.selectedJob == Just selectedJob then
-                        Nothing
-
-                    else
-                        Just selectedJob
-            in
-            ( { model
-                | jobs = newJobs
-                , selectedJob = newSelectedJob
-              }
-            , Cmd.none
-            )
-
-        UpdateNewJob jobTitle ->
-            ( { model | newJob = jobTitle }, Cmd.none )
-
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Noop ->
             ( model, Cmd.none )
 
-        UpdateJobs jobsMsg ->
-            updateJobsThing model.time.now jobsMsg model.jobsThing
-                |> (\( jobsThing, cmd ) -> ( { model | jobsThing = jobsThing }, cmd ))
+        -- # JOBS
+        AddNewJob ->
+            let
+                jobsThing =
+                    model.jobsThing
+            in
+            ( { model
+                | jobsThing =
+                    { jobsThing
+                        | jobs = NewJob (makeUuid model.seed) jobsThing.newJob :: jobsThing.jobs
+                        , newJob = ""
+                    }
+              }
+            , generateNewSeed
+            )
+
+        SelectJob job ->
+            let
+                jobsThing =
+                    model.jobsThing
+
+                jobs =
+                    jobsThing.jobs
+
+                currentTime =
+                    model.time.now
+
+                newId =
+                    makeUuid model.seed
+
+                selectedJob =
+                    case job of
+                        NewJob id str ->
+                            StartedJob id str currentTime
+
+                        StartedJob id str start ->
+                            CompletedJob id str start currentTime (diffTimesInMinutes start currentTime)
+
+                        CompletedJob _ _ _ _ _ ->
+                            job
+
+                newJobs =
+                    jobsThing.jobs
+                        |> List.map
+                            (\thisJob ->
+                                if thisJob == job then
+                                    selectedJob
+
+                                else
+                                    case thisJob of
+                                        StartedJob id title start ->
+                                            CompletedJob id title start currentTime <| diffTimesInMinutes start currentTime
+
+                                        _ ->
+                                            thisJob
+                            )
+
+                newSelectedJob =
+                    if jobsThing.selectedJob == Just selectedJob then
+                        Nothing
+
+                    else
+                        Just selectedJob
+            in
+            ( { model
+                | jobsThing =
+                    { jobsThing
+                        | jobs = newJobs
+                        , selectedJob = newSelectedJob
+                    }
+              }
+            , Cmd.none
+            )
+
+        UpdateNewJob jobTitle ->
+            let
+                jobsThing =
+                    model.jobsThing
+
+                newJobsThing =
+                    { jobsThing | newJob = jobTitle }
+            in
+            ( { model | jobsThing = newJobsThing }, Cmd.none )
 
         UpdateRandomInt int ->
             ( { model | randomInt = int }, Cmd.none )
@@ -558,10 +576,10 @@ view model =
 viewJobsThing : JobsThing -> Posix -> Html Msg
 viewJobsThing model currentTime =
     div []
-        [ Html.form [ onSubmit (UpdateJobs AddNewJob) ]
+        [ Html.form [ onSubmit AddNewJob ]
             [ input
                 [ onInput
-                    (UpdateNewJob >> UpdateJobs)
+                    UpdateNewJob
                 , value model.newJob
                 ]
                 []
@@ -580,14 +598,14 @@ viewJobsThing model currentTime =
                                     ""
                         in
                         case job of
-                            NewJob str ->
-                                li [ class className, onClick (UpdateJobs <| SelectJob job) ] [ text <| "NewJob: " ++ str ]
+                            NewJob id str ->
+                                li [ class className, onClick (SelectJob job) ] [ text <| "NewJob: " ++ str ]
 
-                            StartedJob str start ->
-                                li [ class className, onClick (UpdateJobs <| SelectJob job) ] [ text <| "Running job: " ++ str ++ " (" ++ (String.fromInt <| diffTimesInMinutes start currentTime) ++ "s)" ]
+                            StartedJob id str start ->
+                                li [ class className, onClick (SelectJob job) ] [ text <| "Running job: " ++ str ++ " (" ++ (String.fromInt <| diffTimesInMinutes start currentTime) ++ "s)" ]
 
-                            CompletedJob str _ _ duration ->
-                                li [ class className, onClick (UpdateJobs <| SelectJob job) ] [ text <| "Completed job: " ++ str ++ " (total time: " ++ String.fromInt duration ++ "s)" ]
+                            CompletedJob id str _ _ duration ->
+                                li [ class className, onClick (SelectJob job) ] [ text <| "Completed job: " ++ str ++ " (total time: " ++ String.fromInt duration ++ "s)" ]
                     )
             )
         ]
