@@ -18,7 +18,7 @@ type alias Project =
     , completedAt : Maybe Posix
     , title : String
     , description : String
-    , todos : Maybe (List Todo)
+    , todos : List Todo
     }
 
 
@@ -30,9 +30,7 @@ projectDecoder =
         |> optional "completedAt" (D.nullable <| posixDecoder) Nothing
         |> required "title" D.string
         |> required "description" D.string
-        |> optional "tasks"
-            (D.nullable <| D.list todoDecoder)
-            Nothing
+        |> optional "tasks" (D.list todoDecoder) []
 
 
 projectEncoder : Project -> E.Value

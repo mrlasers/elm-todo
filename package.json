@@ -9,7 +9,6 @@
   "devDependencies": {
     "@webcomponents/webcomponentsjs": "^2.6.0",
     "css-loader": "^6.7.1",
-    "elm": "^0.19.1-5",
     "elm-hot-webpack-loader": "^1.1.8",
     "elm-rte-toolkit": "^1.0.5",
     "elm-webpack-loader": "^8.0.0",

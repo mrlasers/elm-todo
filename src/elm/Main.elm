@@ -391,12 +391,12 @@ update msg model =
                         Incomplete
 
                     tasks =
-                        if List.isEmpty model.form.tasks then
-                            Nothing
+                        model.form.tasks
 
-                        else
-                            Just model.form.tasks
-
+                    -- if List.isEmpty model.form.tasks then
+                    --     Nothing
+                    -- else
+                    --     Just model.form.tasks
                     todos =
                         Project (Maybe.withDefault (makeUuid model.seed) (Just id)) model.time.now Nothing title description tasks :: model.todos
                 in
@@ -556,13 +556,7 @@ viewTodoItem editing { title, id, description, todos } =
             , div [ class "id" ] [ text <| Uuid.toString id ]
             , span [ class "delete", onClick (DeleteTodo id) ] [ text "❌" ]
             , div []
-                (case todos of
-                    Nothing ->
-                        [ text "No tasks" ]
-
-                    Just maybeTasks ->
-                        [ Html.table [] (List.map (\task -> tr [] [ th [] [ text task.title ] ]) maybeTasks) ]
-                )
+                (List.map (\todo -> text todo.title) todos)
             ]
 
 

@@ -49,7 +49,7 @@ todoTests =
                     Nothing
                     text
                     text
-                    Nothing
+                    []
                     |> projectEncoder
                     |> D.decodeValue projectDecoder
                     |> Expect.ok
@@ -60,7 +60,7 @@ todoTests =
                     Nothing
                     text
                     text
-                    (Just [ Todo (makeUuid time) text Nothing Nothing ])
+                    [ Todo (makeUuid time) text Nothing Nothing ]
                     |> projectEncoder
                     |> D.decodeValue projectDecoder
                     |> Result.map .title
