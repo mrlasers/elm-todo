@@ -6,7 +6,8 @@ import Browser exposing (Document)
 import Browser.Events exposing (onKeyDown)
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick, onInput, onSubmit)
+import Html.Events exposing (onClick, onFocus, onInput, onSubmit)
+import Html.MrLasers exposing (..)
 import Iso8601
 import Json.Decode as D
 import Json.Decode.Pipeline as DP exposing (optional, required)
@@ -55,6 +56,12 @@ encodeMessage msg =
                 , ( "payload", E.list projectEncoder projects )
                 ]
 
+        SendShowModal ->
+            E.object [ ( "type", E.string "show-modal" ), ( "payload", E.string "modal-dialog" ) ]
+
+        SendHideModal ->
+            E.object [ ( "type", E.string "hide-modal" ), ( "payload", E.string "modal-dialog" ) ]
+
         -- E.object [ ( "type", E.string "save-todos" ), ( "payload", E.list projectEncoder todos ) ]
         LogToConsole value ->
             case msg of
@@ -88,6 +95,8 @@ type SendPortMessage
     = FocusInputById String
     | SaveProjects (List Project)
     | LogToConsole E.Value
+    | SendShowModal
+    | SendHideModal
 
 
 type ReceivePortMessage
@@ -189,12 +198,18 @@ type alias Model =
         }
     , projects : List Project
     , selectedProject : Maybe Project
+    , showModal : KindOfModal
     }
 
 
 type ProjectField
     = ProjectTitle String
     | ProjectDescription String
+
+
+type KindOfModal
+    = NoModal
+    | DeleteAllProjectsModal
 
 
 type Msg
@@ -208,6 +223,7 @@ type Msg
     | DeleteAllProjects
     | EditProject Project
     | UpdateSelectedProject ProjectField
+    | ShowModal KindOfModal
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -290,10 +306,18 @@ update msg model =
             , saveProjects projects
             )
 
+        ShowModal kind ->
+            case kind of
+                DeleteAllProjectsModal ->
+                    ( { model | showModal = kind }, messageFromElm (encodeMessage SendShowModal) )
+
+                _ ->
+                    ( { model | showModal = kind }, Cmd.none )
+
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.batch [ messageReceiver Recv, Time.every 100 Tick ]
+    Sub.batch [ messageReceiver Recv, Time.every 500 Tick ]
 
 
 cmdGenerateNewSeed : Cmd Msg
@@ -301,25 +325,49 @@ cmdGenerateNewSeed =
     Random.generate GotNewSeed Random.independentSeed
 
 
-onClickToFocus : String -> Attribute Msg
-onClickToFocus =
-    onClick << Send << FocusInputById
+idToOnFocus : String -> Attribute Msg
+idToOnFocus =
+    onFocus << Send << FocusInputById
 
 
 view : Model -> Document Msg
 view model =
     { title = "Tasks.TimothyPew_com"
     , body =
-        [ div []
+        [ dialog
+            [ id "modal-dialog" ]
+            (let
+                { display, onCancel, onConfirm } =
+                    case model.showModal of
+                        DeleteAllProjectsModal ->
+                            { display = [ text "Really wanna delete all the projects?" ]
+                            , onCancel = Send SendHideModal
+                            , onConfirm = Send SendHideModal
+                            }
+
+                        _ ->
+                            { display = [ text "Nothing to see here" ]
+                            , onCancel = Send SendHideModal
+                            , onConfirm = Send SendHideModal
+                            }
+             in
+             [ div [] display
+             , button [ onClick onCancel ] [ text "Cancel" ]
+             , button [ onClick onConfirm ] [ text "Yes, really!!!" ]
+             ]
+            )
+        , div []
             [ button [ onClick AddNewProject ] [ text "+ New Project" ]
-            , button [ onClick DeleteAllProjects ] [ text "Delete All Projects" ]
+            , button [ onClick (ShowModal DeleteAllProjectsModal) ] [ text "Delete All Projects" ]
             ]
         , case model.selectedProject of
             Just proj ->
-                div []
+                div [ class "project-editor" ]
                     [ input
                         [ value proj.title
                         , onInput <| ProjectTitle >> UpdateSelectedProject
+                        , id ("title-" ++ Uuid.toString proj.id)
+                        , idToOnFocus ("title-" ++ Uuid.toString proj.id)
                         ]
                         []
                     , textarea
@@ -352,7 +400,7 @@ view model =
                                     project.title
                                 )
                             ]
-                        , div []
+                        , pre []
                             (project.description
                                 |> String.split "\n"
                                 >> List.map (\line -> p [] [ text line ])
@@ -390,6 +438,7 @@ init flags =
             }
       , projects = projects
       , selectedProject = Nothing
+      , showModal = NoModal
       }
     , Cmd.batch [ cmdGenerateNewSeed, Task.perform AdjustTimeZone Time.here ]
     )
