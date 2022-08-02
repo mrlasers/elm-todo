@@ -35,6 +35,7 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
           "packageDependencies": [\
             ["@webcomponents/webcomponentsjs", "npm:2.6.0"],\
             ["css-loader", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:6.7.1"],\
+            ["dialog-polyfill", "npm:0.5.6"],\
             ["elm-hot-webpack-loader", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:1.1.8"],\
             ["elm-rte-toolkit", "npm:1.0.5"],\
             ["elm-webpack-loader", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:8.0.0"],\
@@ -1530,6 +1531,15 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
           "packageLocation": "./.yarn/cache/detect-node-npm-2.1.0-e8de0e94f7-832184ec45.zip/node_modules/detect-node/",\
           "packageDependencies": [\
             ["detect-node", "npm:2.1.0"]\
+          ],\
+          "linkType": "HARD"\
+        }]\
+      ]],\
+      ["dialog-polyfill", [\
+        ["npm:0.5.6", {\
+          "packageLocation": "./.yarn/cache/dialog-polyfill-npm-0.5.6-2a36d9e8ee-dde8d4b6a6.zip/node_modules/dialog-polyfill/",\
+          "packageDependencies": [\
+            ["dialog-polyfill", "npm:0.5.6"]\
           ],\
           "linkType": "HARD"\
         }]\
@@ -3225,6 +3235,7 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["mrlasers-webpack-starter", "workspace:."],\
             ["@webcomponents/webcomponentsjs", "npm:2.6.0"],\
             ["css-loader", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:6.7.1"],\
+            ["dialog-polyfill", "npm:0.5.6"],\
             ["elm-hot-webpack-loader", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:1.1.8"],\
             ["elm-rte-toolkit", "npm:1.0.5"],\
             ["elm-webpack-loader", "virtual:657504f2894a59ff33d3c4a616c3fa8147a965776833538426c880951d74044a9b4f18579ca24ceaa6182c66d581d707eaf7b8ef1ee3466053da0386bc75bb88#npm:8.0.0"],\

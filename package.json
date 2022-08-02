@@ -9,6 +9,7 @@
   "devDependencies": {
     "@webcomponents/webcomponentsjs": "^2.6.0",
     "css-loader": "^6.7.1",
+    "dialog-polyfill": "^0.5.6",
     "elm-hot-webpack-loader": "^1.1.8",
     "elm-rte-toolkit": "^1.0.5",
     "elm-webpack-loader": "^8.0.0",

@@ -1,6 +1,7 @@
 import '@webcomponents/webcomponentsjs/webcomponents-bundle.js'
 import '@webcomponents/webcomponentsjs/custom-elements-es5-adapter.js'
 import 'elm-rte-toolkit'
+// import 'dialog-polyfill' // installed this polyfill, but won't include it unless that turns out to be necessary
 
 const { Elm } = require('../elm/Main.elm')
 
@@ -19,13 +20,27 @@ app.ports.messageFromElm.subscribe((msg) => {
 
   switch (type) {
     default:
-      return console.log('Got a message from Elm:', msg)
+      console.log('Got a message from Elm:', msg)
+      return
     case 'focus-element':
-      return document.getElementById(payload)?.select()
+      document.getElementById(payload)?.select()
+      return
     case 'save-todos':
-      return localStorage.setItem('todos', JSON.stringify(payload))
+      localStorage.setItem('todos', JSON.stringify(payload))
+      return
     case 'save-projects':
       console.log('saving projects', payload)
-      return localStorage.setItem('projects', JSON.stringify(payload))
+      localStorage.setItem('projects', JSON.stringify(payload))
+      return
+    case 'show-modal': {
+      const modal = document.getElementById(payload)
+      modal?.showModal()
+      return
+    }
+    case 'hide-modal': {
+      const modal = document.getElementById(payload)
+      modal?.close()
+      return
+    }
   }
 })

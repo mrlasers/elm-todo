@@ -1213,6 +1213,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"dialog-polyfill@npm:^0.5.6":
+  version: 0.5.6
+  resolution: "dialog-polyfill@npm:0.5.6"
+  checksum: dde8d4b6a62b63b710e0d0d70b615d92ff08f3cb2b521e1f99b17e8220d9d55d0fdf9fc17fbe77b0ff1be817094e14b60c4c4bacd5456fba427ede48d2d90230
+  languageName: node
+  linkType: hard
+
 "dns-equal@npm:^1.0.0":
   version: 1.0.0
   resolution: "dns-equal@npm:1.0.0"
@@ -2641,6 +2648,7 @@ __metadata:
   dependencies:
     "@webcomponents/webcomponentsjs": ^2.6.0
     css-loader: ^6.7.1
+    dialog-polyfill: ^0.5.6
     elm-hot-webpack-loader: ^1.1.8
     elm-rte-toolkit: ^1.0.5
     elm-webpack-loader: ^8.0.0
