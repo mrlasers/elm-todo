@@ -41,6 +41,11 @@ main =
 port messageFromElm : E.Value -> Cmd msg
 
 
+sendFromElm : SendPortMessage -> Cmd msg
+sendFromElm =
+    encodeMessage >> messageFromElm
+
+
 port messageReceiver : (String -> msg) -> Sub msg
 
 
@@ -262,7 +267,7 @@ update msg model =
             )
 
         DeleteAllProjects ->
-            ( { model | projects = [], selectedProject = Nothing }, saveProjects model.projects )
+            ( { model | projects = [], selectedProject = Nothing }, Cmd.batch [ saveProjects model.projects, sendFromElm SendHideModal ] )
 
         EditProject project ->
             ( { model
@@ -342,7 +347,7 @@ view model =
                         DeleteAllProjectsModal ->
                             { display = [ text "Really wanna delete all the projects?" ]
                             , onCancel = Send SendHideModal
-                            , onConfirm = Send SendHideModal
+                            , onConfirm = DeleteAllProjects
                             }
 
                         _ ->
@@ -383,29 +388,33 @@ view model =
             (List.map
                 (\project ->
                     let
-                        selectedClass =
+                        className =
                             if model.selectedProject == Just project then
                                 "selected"
 
                             else
                                 ""
-                    in
-                    li [ onClick (EditProject project), class selectedClass ]
-                        [ h3 []
-                            [ text
-                                (if String.isEmpty project.title then
-                                    "[Untitled Project; think about adding a title]"
 
-                                 else
+                        title =
+                            case project.title of
+                                "" ->
+                                    "[Untitled Project - think about adding a title]"
+
+                                _ ->
                                     project.title
-                                )
-                            ]
-                        , pre []
-                            (project.description
+
+                        description =
+                            project.description
                                 |> String.split "\n"
                                 >> List.map (\line -> p [] [ text line ])
-                            )
-                        , div [] [ text <| Uuid.toString project.id ]
+
+                        cardFooter =
+                            div [] [ text <| Uuid.toString project.id ]
+                    in
+                    li [ onClick (EditProject project), class className ]
+                        [ h3 [] [ text title ]
+                        , pre [] description
+                        , cardFooter
                         ]
                 )
                 model.projects
