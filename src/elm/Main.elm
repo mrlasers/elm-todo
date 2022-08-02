@@ -1,5 +1,7 @@
 port module Main exposing (flagsDecoder, main)
 
+-- import Todo exposing (Job(..), Project, Todo, projectDecoder, projectEncoder)
+
 import Browser exposing (Document)
 import Browser.Events exposing (onKeyDown)
 import Html exposing (..)
@@ -12,10 +14,8 @@ import Json.Encode as E
 import List
 import Platform exposing (Task)
 import Random
-import Stateful exposing (stateful)
 import Task
 import Time exposing (Posix)
-import Todo exposing (Job(..), Project, Todo, projectDecoder, projectEncoder)
 import Uuid exposing (Uuid, uuidGenerator)
 
 
@@ -49,18 +49,44 @@ encodeMessage msg =
         FocusInputById id ->
             E.object [ ( "type", E.string "focus-element" ), ( "payload", E.string id ) ]
 
-        SaveTodosList todos ->
-            E.object [ ( "type", E.string "save-todos" ), ( "payload", E.list projectEncoder todos ) ]
+        SaveProjects projects ->
+            E.object
+                [ ( "type", E.string "save-projects" )
+                , ( "payload", E.list projectEncoder projects )
+                ]
 
+        -- E.object [ ( "type", E.string "save-todos" ), ( "payload", E.list projectEncoder todos ) ]
         LogToConsole value ->
             case msg of
                 _ ->
                     E.object [ ( "type", E.string "console-log" ), ( "payload", value ) ]
 
 
+projectEncoder : Project -> E.Value
+projectEncoder project =
+    E.object
+        [ ( "id", E.string (Uuid.toString project.id) )
+        , ( "title", E.string project.title )
+        , ( "description", E.string project.description )
+        ]
+
+
+projectDecoder : D.Decoder Project
+projectDecoder =
+    D.succeed Project
+        |> DP.required "id" Uuid.decoder
+        |> DP.required "title" D.string
+        |> DP.optional "description" D.string ""
+
+
+saveProjects : List Project -> Cmd msg
+saveProjects =
+    SaveProjects >> encodeMessage >> messageFromElm
+
+
 type SendPortMessage
     = FocusInputById String
-    | SaveTodosList (List Project)
+    | SaveProjects (List Project)
     | LogToConsole E.Value
 
 
@@ -116,66 +142,6 @@ diffTimesInMinutes start end =
         // 1000
 
 
-type alias JobsThing =
-    { jobs : List Job
-    , newJob : String
-    , selectedJob : Maybe Job
-    }
-
-
-type alias Model =
-    { seed : Random.Seed
-    , randomInt : Int
-    , jobsThing :
-        JobsThing
-    , todos : List Project
-    , filteredTodos : List Project
-    , todoView : TodoView
-    , editing : Maybe Uuid
-    , form : FormData
-    , jsMessage : String
-    , time :
-        { now : Time.Posix
-        , zone : Time.Zone
-        }
-    }
-
-
-type TodoStatus
-    = Complete Time.Posix
-    | Incomplete
-
-
-type alias FormData =
-    { id : Maybe Uuid
-    , title : String
-    , description : String
-    , tasks : List Todo
-    }
-
-
-type FormFieldUpdate
-    = UpdateTitle String
-    | UpdateDescription String
-    | AddTodoTask
-    | UpdateTaskTitle Int String
-
-
-type TodoView
-    = TodoGrid
-    | TodoList
-
-
-todoViewToString : TodoView -> String
-todoViewToString style =
-    case style of
-        TodoGrid ->
-            "grid"
-
-        TodoList ->
-            "list"
-
-
 makeUuid : Random.Seed -> Uuid
 makeUuid =
     Random.step uuidGenerator >> Tuple.first
@@ -208,36 +174,40 @@ makeUTCZuluTimeString time =
 -- UPDATE
 
 
+type alias Project =
+    { id : Uuid
+    , title : String
+    , description : String
+    }
+
+
+type alias Model =
+    { seed : Random.Seed
+    , time :
+        { now : Time.Posix
+        , zone : Time.Zone
+        }
+    , projects : List Project
+    , selectedProject : Maybe Project
+    }
+
+
+type ProjectField
+    = ProjectTitle String
+    | ProjectDescription String
+
+
 type Msg
     = Noop
-    | GotNewSeed Random.Seed
-    | AddTodo
-    | UpdateForm FormFieldUpdate
-    | SetDisplayType TodoView
-    | DeleteTodo Uuid
-    | DeleteAllTodos
-    | UpdateTodo Uuid TodoUpdate
     | Recv String
-    | UpdateJsMessage String
+    | GotNewSeed Random.Seed
     | Send SendPortMessage
     | Tick Time.Posix
     | AdjustTimeZone Time.Zone
-    | UpdateRandomInt Int
-    | AddNewJob
-    | UpdateNewJob String
-    | SelectJob Job
-
-
-type TodoUpdate
-    = ToggleComplete
-    | AddTask
-    | UpdateTask Uuid String
-    | DeleteTask Uuid
-
-
-randomInt : Random.Generator Int
-randomInt =
-    Random.int Random.minInt Random.maxInt
+    | AddNewProject
+    | DeleteAllProjects
+    | EditProject Project
+    | UpdateSelectedProject ProjectField
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -246,261 +216,79 @@ update msg model =
         Noop ->
             ( model, Cmd.none )
 
-        -- # JOBS
-        AddNewJob ->
-            let
-                jobsThing =
-                    model.jobsThing
-            in
-            ( { model
-                | jobsThing =
-                    { jobsThing
-                        | jobs = NewJob (makeUuid model.seed) jobsThing.newJob :: jobsThing.jobs
-                        , newJob = ""
-                    }
-              }
-            , generateNewSeed
-            )
-
-        SelectJob job ->
-            let
-                jobsThing =
-                    model.jobsThing
-
-                jobs =
-                    jobsThing.jobs
-
-                currentTime =
-                    model.time.now
-
-                newId =
-                    makeUuid model.seed
-
-                selectedJob =
-                    case job of
-                        NewJob id str ->
-                            StartedJob id str currentTime
-
-                        StartedJob id str start ->
-                            CompletedJob id str start currentTime (diffTimesInMinutes start currentTime)
-
-                        CompletedJob _ _ _ _ _ ->
-                            job
-
-                newJobs =
-                    jobsThing.jobs
-                        |> List.map
-                            (\thisJob ->
-                                if thisJob == job then
-                                    selectedJob
-
-                                else
-                                    case thisJob of
-                                        StartedJob id title start ->
-                                            CompletedJob id title start currentTime <| diffTimesInMinutes start currentTime
-
-                                        _ ->
-                                            thisJob
-                            )
-
-                newSelectedJob =
-                    if jobsThing.selectedJob == Just selectedJob then
-                        Nothing
-
-                    else
-                        Just selectedJob
-            in
-            ( { model
-                | jobsThing =
-                    { jobsThing
-                        | jobs = newJobs
-                        , selectedJob = newSelectedJob
-                    }
-              }
-            , Cmd.none
-            )
-
-        UpdateNewJob jobTitle ->
-            let
-                jobsThing =
-                    model.jobsThing
-
-                newJobsThing =
-                    { jobsThing | newJob = jobTitle }
-            in
-            ( { model | jobsThing = newJobsThing }, Cmd.none )
-
-        UpdateRandomInt int ->
-            ( { model | randomInt = int }, Cmd.none )
-
-        Tick newTime ->
-            ( model.time
-                |> (\time -> { model | time = { time | now = newTime } })
-            , Cmd.none
-            )
-
-        AdjustTimeZone zone ->
-            ( model.time
-                |> (\time -> { model | time = { time | zone = zone } })
-            , Cmd.none
-            )
-
-        GotNewSeed newSeed ->
-            ( { model | seed = newSeed }, Cmd.none )
-
-        UpdateTodo id action ->
-            let
-                newTodos =
-                    case action of
-                        AddTask ->
-                            model.todos
-
-                        -- |> List.map
-                        --     (\todo ->
-                        --         if todo.id == id then
-                        --             { todo | tasks = todo.tasks ++ [ TodoTask (makeUuid model.seed) "Next Task" Nothing Nothing ] }
-                        --         else
-                        --             todo
-                        --     )
-                        DeleteTask taskId ->
-                            model.todos
-
-                        -- |> List.map
-                        --     (\todo ->
-                        --         if todo.id == id then
-                        --             { todo | tasks = todo.tasks |> List.filter (\task -> task.id /= taskId) }
-                        --         else
-                        --             todo
-                        --     )
-                        UpdateTask taskId value ->
-                            model.todos
-
-                        -- |> List.map
-                        --     (\todo ->
-                        --         if todo.id == id then
-                        --             let
-                        --                 tasks =
-                        --                     todo.tasks
-                        --                         |> List.map
-                        --                             (\task ->
-                        --                                 if task.id == taskId then
-                        --                                     { task | title = value }
-                        --                                 else
-                        --                                     task
-                        --                             )
-                        --             in
-                        --             { todo | tasks = tasks }
-                        --         else
-                        --             todo
-                        --     )
-                        _ ->
-                            model.todos
-            in
-            ( { model | todos = newTodos }
-            , generateNewSeed
-            )
-
-        --         )
-        UpdateForm field ->
-            let
-                { form } =
-                    model
-            in
-            case field of
-                UpdateTitle title ->
-                    ( { model | form = { form | title = title } }, Cmd.none )
-
-                UpdateDescription desc ->
-                    ( { model | form = { form | description = desc } }, Cmd.none )
-
-                UpdateTaskTitle id title ->
-                    let
-                        x =
-                            1
-                    in
-                    ( model
-                    , Cmd.none
-                    )
-
-                AddTodoTask ->
-                    let
-                        id =
-                            makeUuid model.seed
-
-                        start =
-                            Nothing
-
-                        end =
-                            Nothing
-
-                        title =
-                            "Untitled Task"
-                    in
-                    ( { model | form = { form | tasks = [ Todo id title start end ] } }, generateNewSeed )
-
-        SetDisplayType viewType ->
-            ( { model | todoView = viewType }, Cmd.none )
-
-        AddTodo ->
-            if String.isEmpty model.form.title then
-                ( model, Cmd.none )
-
-            else
-                let
-                    createdAt =
-                        model.time.now
-
-                    { title, description } =
-                        model.form
-
-                    id =
-                        model.form.id
-                            |> Maybe.withDefault (makeUuid model.seed)
-
-                    status =
-                        Incomplete
-
-                    tasks =
-                        model.form.tasks
-
-                    -- if List.isEmpty model.form.tasks then
-                    --     Nothing
-                    -- else
-                    --     Just model.form.tasks
-                    todos =
-                        Project (Maybe.withDefault (makeUuid model.seed) (Just id)) model.time.now Nothing title description tasks :: model.todos
-                in
-                ( { model | todos = todos, form = FormData Nothing "" "" [] }
-                , Cmd.batch [ messageFromElm (encodeMessage (SaveTodosList todos)), generateNewSeed ]
-                )
-
-        DeleteTodo id ->
-            let
-                newTodos =
-                    List.filter (\td -> td.id /= id) model.todos
-            in
-            ( { model | todos = newTodos }
-            , messageFromElm (encodeMessage (SaveTodosList newTodos))
-            )
-
-        DeleteAllTodos ->
-            ( { model | todos = [] }
-            , messageFromElm (encodeMessage (SaveTodosList []))
-            )
-
-        UpdateJsMessage text ->
-            ( { model | jsMessage = text }, messageFromElm (E.string "Updated jsMessage...") )
-
         Recv message ->
             case decodeReceivedMessage message of
-                PortString text ->
-                    ( { model | jsMessage = text }, Cmd.none )
+                PortString _ ->
+                    ( model, Cmd.none )
 
-                UnhandledPortMessage text ->
-                    ( { model | jsMessage = text }, Cmd.none )
+                UnhandledPortMessage _ ->
+                    ( model, Cmd.none )
 
         Send message ->
             ( model, messageFromElm (encodeMessage message) )
+
+        GotNewSeed seed ->
+            ( { model | seed = seed }, Cmd.none )
+
+        Tick now ->
+            ( { model | time = { now = now, zone = model.time.zone } }, Cmd.none )
+
+        AdjustTimeZone zone ->
+            ( { model | time = { now = model.time.now, zone = zone } }, Cmd.none )
+
+        AddNewProject ->
+            let
+                projects =
+                    Project (makeUuid model.seed) "New Project" "" :: model.projects
+            in
+            ( { model | projects = projects }
+            , Cmd.batch [ saveProjects projects, cmdGenerateNewSeed ]
+            )
+
+        DeleteAllProjects ->
+            ( { model | projects = [], selectedProject = Nothing }, saveProjects model.projects )
+
+        EditProject project ->
+            ( { model
+                | selectedProject =
+                    if model.selectedProject == Just project then
+                        Nothing
+
+                    else
+                        Just project
+              }
+            , Cmd.none
+            )
+
+        UpdateSelectedProject field ->
+            let
+                selectedProject =
+                    model.selectedProject
+                        |> Maybe.map
+                            (\proj ->
+                                case field of
+                                    ProjectTitle title ->
+                                        { proj | title = title }
+
+                                    ProjectDescription desc ->
+                                        { proj | description = desc }
+                            )
+
+                projects =
+                    model.projects
+                        |> List.map
+                            (\proj ->
+                                if Just proj == model.selectedProject then
+                                    selectedProject |> Maybe.withDefault proj
+
+                                else
+                                    proj
+                            )
+            in
+            ( { model | projects = projects, selectedProject = selectedProject }
+              -- , messageFromElm (encodeMessage (SaveProjects projects))
+            , saveProjects projects
+            )
 
 
 subscriptions : Model -> Sub Msg
@@ -508,8 +296,8 @@ subscriptions _ =
     Sub.batch [ messageReceiver Recv, Time.every 100 Tick ]
 
 
-generateNewSeed : Cmd Msg
-generateNewSeed =
+cmdGenerateNewSeed : Cmd Msg
+cmdGenerateNewSeed =
     Random.generate GotNewSeed Random.independentSeed
 
 
@@ -522,196 +310,93 @@ view : Model -> Document Msg
 view model =
     { title = "Tasks.TimothyPew_com"
     , body =
-        [ viewHeader model
-        , viewJobsThing model.jobsThing model.time.now
-        , main_ []
-            [ div [] [ text "put editor here" ]
-            , Html.form [ class "new-task", onSubmit AddTodo ]
-                [ label []
-                    [ span [] [ text "Title" ]
-                    , input
-                        [ id "task-title"
-                        , type_ "text"
-                        , autocomplete False
-                        , placeholder "Todo0 title"
-                        , value model.form.title
-                        , onClickToFocus "task-title"
-                        , onInput (UpdateForm << UpdateTitle)
-                        ]
-                        []
-                    ]
-                , label []
-                    [ span [] [ text "Description" ]
-                    , textarea
-                        [ placeholder "Todo description/notes"
-                        , value model.form.description
-                        , onInput (UpdateForm << UpdateDescription)
-                        ]
-                        []
-                    ]
-                , if List.isEmpty model.form.tasks then
-                    text ""
-
-                  else
-                    div [] (List.map (\task -> input [ type_ "text", placeholder task.title ] []) model.form.tasks)
-                , div [ class "buttons" ]
-                    [ input [ type_ "button", value "+", onClick (UpdateForm AddTodoTask) ] []
-                    , input [ type_ "submit", value "Add Todo" ] []
-                    ]
-                ]
-            , div [ class "todo-list" ]
-                (if List.isEmpty model.todos then
-                    [ text "Add some todos, brud!" ]
-
-                 else
-                    [ ul [ class ("todo-list " ++ todoViewToString model.todoView) ]
-                        (List.map (viewTodoItem model.editing) <| model.todos)
-                    ]
-                )
+        [ div []
+            [ button [ onClick AddNewProject ] [ text "+ New Project" ]
+            , button [ onClick DeleteAllProjects ] [ text "Delete All Projects" ]
             ]
-        , viewFooter model
+        , case model.selectedProject of
+            Just proj ->
+                div []
+                    [ input
+                        [ value proj.title
+                        , onInput <| ProjectTitle >> UpdateSelectedProject
+                        ]
+                        []
+                    , textarea
+                        [ value proj.description
+                        , onInput <| ProjectDescription >> UpdateSelectedProject
+                        ]
+                        []
+                    ]
+
+            Nothing ->
+                text ""
+        , ul [ class "projects-list" ]
+            (List.map
+                (\project ->
+                    let
+                        selectedClass =
+                            if model.selectedProject == Just project then
+                                "selected"
+
+                            else
+                                ""
+                    in
+                    li [ onClick (EditProject project), class selectedClass ]
+                        [ h3 []
+                            [ text
+                                (if String.isEmpty project.title then
+                                    "[Untitled Project; think about adding a title]"
+
+                                 else
+                                    project.title
+                                )
+                            ]
+                        , div []
+                            (project.description
+                                |> String.split "\n"
+                                >> List.map (\line -> p [] [ text line ])
+                            )
+                        , div [] [ text <| Uuid.toString project.id ]
+                        ]
+                )
+                model.projects
+            )
         ]
     }
 
 
-viewJobsThing : JobsThing -> Posix -> Html Msg
-viewJobsThing model currentTime =
-    div []
-        [ Html.form [ onSubmit AddNewJob ]
-            [ input
-                [ onInput
-                    UpdateNewJob
-                , value model.newJob
-                ]
-                []
-            , button [] [ text "Add shit" ]
-            ]
-        , ul [ class "jobs" ]
-            (model.jobs
-                |> List.map
-                    (\job ->
-                        let
-                            className =
-                                if Just job == model.selectedJob then
-                                    "shit"
-
-                                else
-                                    ""
-                        in
-                        case job of
-                            NewJob id str ->
-                                li [ class className, onClick (SelectJob job) ] [ text <| "NewJob: " ++ str ]
-
-                            StartedJob id str start ->
-                                li [ class className, onClick (SelectJob job) ] [ text <| "Running job: " ++ str ++ " (" ++ (String.fromInt <| diffTimesInMinutes start currentTime) ++ "s)" ]
-
-                            CompletedJob id str _ _ duration ->
-                                li [ class className, onClick (SelectJob job) ] [ text <| "Completed job: " ++ str ++ " (total time: " ++ String.fromInt duration ++ "s)" ]
-                    )
-            )
-        ]
-
-
-viewHeader : Model -> Html Msg
-viewHeader model =
-    header []
-        [ nav []
-            [ case model.todoView of
-                TodoList ->
-                    button [ onClick (SetDisplayType TodoGrid) ] [ text "View as Grid" ]
-
-                TodoGrid ->
-                    button [ onClick (SetDisplayType TodoList) ] [ text "View as List" ]
-            , text " | "
-            , button [ onClick DeleteAllTodos ] [ text "Delete All" ]
-            ]
-        , div [] [ text ("Time: " ++ makeFormattedTimeString model.time) ]
-        , div [] [ text ("Zulu: " ++ makeUTCZuluTimeString model.time.now) ]
-        ]
-
-
-viewFooter : Model -> Html Msg
-viewFooter model =
-    footer []
-        [ div [ class "debug" ]
-            [ div []
-                (model.jsMessage
-                    |> String.split "\n"
-                    |> List.filter (not << String.isEmpty)
-                    |> List.map (\line -> p [] [ text line ])
-                )
-            ]
-        ]
-
-
-viewTodoItem : Maybe Uuid -> Project -> Html Msg
-viewTodoItem editing { title, id, description, todos } =
-    let
-        isEditing =
-            case editing of
-                Just editId ->
-                    editId == id
-
-                Nothing ->
-                    False
-    in
-    if isEditing then
-        div [] [ text "i'm being edited" ]
-
-    else
-        li [ class "todo-item" ]
-            [ h3 [] [ text title ]
-            , p [] [ text description ]
-            , div [ class "id" ] [ text <| Uuid.toString id ]
-            , span [ class "delete", onClick (DeleteTodo id) ] [ text "❌" ]
-            , div []
-                (List.map (\todo -> text todo.title) todos)
-            ]
-
-
 type alias Flags =
-    { seed : Int, todos : List Project }
+    { seed : Int, projects : List Project }
 
 
 init : E.Value -> ( Model, Cmd Msg )
 init flags =
     ( let
-        { seed, todos } =
-            case D.decodeValue flagsDecoder flags of
-                Ok res ->
-                    { seed = Random.initialSeed res.seed
-                    , todos = res.todos
-                    }
+        { seed, projects } =
+            Result.withDefault { seed = 666, projects = [] }
+                (D.decodeValue flagsDecoder flags)
 
-                Err _ ->
-                    { seed = Random.initialSeed 666
-                    , todos = []
-                    }
+        -- newSeed =
+        --     D.decodeValue flagsDecoder flags
+        --         |> Result.map (\{ seed } -> seed)
+        --         |> Result.withDefault 666
+        --         |> Random.initialSeed
       in
-      { seed = seed
-      , randomInt = 0
-      , jobsThing =
-            { newJob = ""
-            , selectedJob = Nothing
-            , jobs = []
-            }
-      , todos = todos
-      , filteredTodos = todos
-      , editing = Nothing
-      , form = FormData (Just (makeUuid seed)) "" "" []
-      , jsMessage = "ello, world"
-      , todoView = TodoList
+      { seed = Random.initialSeed seed
       , time =
             { now = Time.millisToPosix 0
             , zone = Time.utc
             }
+      , projects = projects
+      , selectedProject = Nothing
       }
-    , Cmd.batch [ generateNewSeed, Task.perform AdjustTimeZone Time.here ]
+    , Cmd.batch [ cmdGenerateNewSeed, Task.perform AdjustTimeZone Time.here ]
     )
 
 
-flagsDecoder : D.Decoder { seed : Int, todos : List Project }
+flagsDecoder : D.Decoder Flags
 flagsDecoder =
     D.succeed Flags
         |> DP.required "seed" D.int
-        |> DP.required "todos" (D.list projectDecoder)
+        |> DP.optional "projects" (D.list projectDecoder) []

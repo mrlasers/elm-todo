@@ -6,7 +6,7 @@ const { Elm } = require('../elm/Main.elm')
 
 const flags = {
   seed: Math.floor(Math.random() * 0xffffffff),
-  todos: JSON.parse(localStorage.getItem('todos') ?? '[]'),
+  projects: JSON.parse(localStorage.getItem('projects') ?? '[]'),
 }
 
 const app = Elm.Main.init({
@@ -24,5 +24,8 @@ app.ports.messageFromElm.subscribe((msg) => {
       return document.getElementById(payload)?.select()
     case 'save-todos':
       return localStorage.setItem('todos', JSON.stringify(payload))
+    case 'save-projects':
+      console.log('saving projects', payload)
+      return localStorage.setItem('projects', JSON.stringify(payload))
   }
 })
