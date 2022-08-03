@@ -628,7 +628,10 @@ view model =
             , div [ class "projects-list-container" ]
                 [ div [ class "projects-list-header" ]
                     [ h3 [] [ text "Projects" ]
-                    , button [ onClick AddNewProject ] [ text "+" ]
+                    , div []
+                        [ button [ onClick AddNewProject ] [ text "+" ]
+                        , button [ onClick DeleteAllProjects, class "danger" ] [ i [ class "fa fa-trash-o " ] [] ]
+                        ]
                     ]
                 , ul [ class "projects-list" ] <|
                     List.map
