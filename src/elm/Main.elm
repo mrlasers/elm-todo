@@ -8,7 +8,17 @@ import Browser.Events exposing (onKeyDown)
 import FontAwesome as FA exposing (icon, plus, trash)
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onBlur, onClick, onFocus, onInput, onSubmit, stopPropagationOn)
+import Html.Events
+    exposing
+        ( on
+        , onBlur
+        , onClick
+        , onFocus
+        , onInput
+        , onSubmit
+        , stopPropagationOn
+        , targetValue
+        )
 import Html.MrLasers exposing (..)
 import Iso8601
 import Json.Decode as D
@@ -20,12 +30,6 @@ import Random
 import Task
 import Time exposing (Posix)
 import Uuid exposing (Uuid, uuidGenerator)
-
-
-
--- stopClick : msg -> Attribute msg
--- stopClick message =
---   on "click" (Decode.succeed message)
 
 
 type Crud
@@ -63,7 +67,29 @@ crud compare action item list =
             list |> List.filter (\oldItem -> if_ (compare item oldItem) False True)
 
 
+logString : String -> D.Decoder Msg
+logString str =
+    D.succeed <| LogString str
 
+
+decodeMsgBool : msg -> D.Decoder ( msg, Bool )
+decodeMsgBool msg =
+    D.succeed ( msg, True )
+
+
+anyMsg : msg -> D.Decoder msg
+anyMsg msg =
+    D.succeed msg
+
+
+onClickStop : msg -> Attribute msg
+onClickStop message =
+    stopPropagationOn "click" (D.map (\msg -> ( msg, True )) (D.succeed message))
+
+
+
+-- stopPropagationOn "click" (D.map (\msg -> ( msg, True )) (logString "goddamnit"))
+-- Html.Events.stopPropagationOn "click" <| D.map (\a -> ( a, True )) (D.map tagger D.string)
 -- MAIN
 
 
@@ -342,6 +368,7 @@ type KindOfModal
 
 type Msg
     = Noop
+    | LogString String
     | Recv String
     | GotNewSeed Random.Seed
     | Send SendPortMessage
@@ -397,7 +424,10 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Noop ->
-            ( model, Cmd.none )
+            ( model, sendFromElm <| LogToConsole (E.string "BOOP") )
+
+        LogString str ->
+            ( model, sendFromElm (LogToConsole (E.string str)) )
 
         Recv message ->
             case decodeReceivedMessage message of
@@ -586,53 +616,71 @@ view model =
     , body =
         [ header []
             [ nav []
-                [ div [ class "brand" ] [ text "Projects" ] ]
+                [ div [ class "brand" ] [ text "Project Todoer" ] ]
             ]
         , main_ []
-            [ div [] [ text "Showing editing project here" ]
-            , div [ class "projects-list" ]
-                [ h3 [] [ text "Projects" ]
-                , ul []
-                    (model.projects
-                        |> (List.map <|
-                                viewProjectCard
-                                    { elem = li
-                                    , editing = model.selectedProject
-                                    }
-                           )
-                    )
+            [ case model.selectedProject of
+                Just project ->
+                    viewProjectEditor project
+
+                Nothing ->
+                    div [] [ text "Maybe select a project, brud" ]
+            , div [ class "projects-list-container" ]
+                [ div [ class "projects-list-header" ]
+                    [ h3 [] [ text "Projects" ]
+                    , button [ onClick AddNewProject ] [ text "+" ]
+                    ]
+                , ul [ class "projects-list" ] <|
+                    List.map
+                        (\project ->
+                            viewProjectCard
+                                { elem = li
+                                , active =
+                                    Just project == model.selectedProject
+                                , project = project
+                                }
+                        )
+                        model.projects
                 ]
             ]
         ]
     }
+
+
+viewProjectEditor : Project -> Html msg
+viewProjectEditor project =
+    div [ class "project-editor" ]
+        [ h2 [] [ text project.title ]
+        , div [] [ p [] [ text project.description ] ]
+        ]
 
 
 viewProjectCard :
     { elem : List (Attribute Msg) -> List (Html Msg) -> Html Msg
-    , editing : Maybe Project
+    , active : Bool
+    , project : Project
     }
-    -> Project
     -> Html Msg
-viewProjectCard { elem, editing } project =
-    let
-        isEditing =
-            Just project == editing
-    in
+viewProjectCard { elem, active, project } =
     elem
         [ class
             ("project-list-card "
-                ++ if_ isEditing "active" ""
+                ++ if_ active "active" ""
             )
         , onClick <| EditProject project
         ]
         [ h4 [] [ text project.title ]
-        , div [ class "next-todo", onClick Noop ]
-            [ div []
-                [ div [ class "up-next" ] [ text "Next up..." ]
-                , div [] [ text "Do something new" ]
+        , if active then
+            button [ class "next-todo", onClickStop (LogString "FUCKING YATTA!!!") ]
+                [ div []
+                    [ div [ class "up-next" ] [ text "Next up..." ]
+                    , div [] [ text "Do something new" ]
+                    ]
+                , button [ class "fa fa-lg fa-fw fa-arrow-circle-right" ] []
                 ]
-            , button [ class "fa fa-lg fa-fw fa-arrow-circle-right" ] []
-            ]
+
+          else
+            text ""
         ]
 
 

@@ -36,7 +36,7 @@ main {
   justify-content: space-between;
 }
 
-.projects-list {
+.projects-list-container {
   h3 {
     margin-top: 0;
   }
@@ -48,10 +48,42 @@ main {
   }
 }
 
-.project-list-card {
+.projects-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5em;
+
+  h3 {
+    margin: 0;
+  }
+}
+
+.project-editor {
+  display: grid;
+
+  p {
+    border: 1px solid green;
+  }
+}
+
+.projects-list {
   --bg-color: white;
   --fg-color: black;
+  --border-color: black;
+  --border-radius: 0.75em;
+  --border-thickness: 0.32rem;
 
+  width: 24ch;
+
+  box-shadow: 0.5rem 0.75rem 0 black;
+  border-radius: 0.75em;
+  border: var(--border-thickness) solid;
+  outline: 1px solid black;
+  overflow: hidden;
+}
+
+.project-list-card {
   display: flex;
   flex-direction: column;
   gap: 1em;
@@ -62,29 +94,14 @@ main {
   background-color: var(--bg-color);
   color: var(--fg-color);
 
-  border: 0.2rem solid;
-  box-shadow: 0.5rem 0.75rem 0 black;
+  // border: 0.2rem solid;
+
+  & + & {
+    border-top: var(--border-thickness) solid;
+  }
 
   &.active {
     --bg-color: #dfdfdf;
-    border-left-color: var(--bg-color);
-
-    &:first-child {
-      border-top-left-radius: 0;
-    }
-
-    &:last-child {
-      border-bottom-left-radius: 0;
-    }
-  }
-
-  &:first-child {
-    border-top-left-radius: 0.75em;
-    border-top-right-radius: 0.75em;
-  }
-  &:last-child {
-    border-bottom-left-radius: 0.75em;
-    border-bottom-right-radius: 0.75em;
   }
 
   h4 {
@@ -100,10 +117,12 @@ main {
   .next-todo {
     display: flex;
     justify-content: space-between;
-    background-color: darkgrey;
+    background-color: lightcoral;
     color: white;
     padding: 0.25em 0.5em;
     border-radius: 0.35em;
+    border: 0;
+
     cursor: pointer;
 
     &:hover {
