@@ -3,10 +3,12 @@ port module Main exposing (flagsDecoder, main)
 -- import Todo exposing (Job(..), Project, Todo, projectDecoder, projectEncoder)
 
 import Browser exposing (Document)
+import Browser.Dom as Dom
 import Browser.Events exposing (onKeyDown)
+import FontAwesome as FA exposing (icon, plus, trash)
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick, onFocus, onInput, onSubmit)
+import Html.Events exposing (onBlur, onClick, onFocus, onInput, onSubmit, stopPropagationOn)
 import Html.MrLasers exposing (..)
 import Iso8601
 import Json.Decode as D
@@ -18,6 +20,47 @@ import Random
 import Task
 import Time exposing (Posix)
 import Uuid exposing (Uuid, uuidGenerator)
+
+
+
+-- stopClick : msg -> Attribute msg
+-- stopClick message =
+--   on "click" (Decode.succeed message)
+
+
+type Crud
+    = Add
+    | Update
+    | Remove
+
+
+if_ : Bool -> c -> c -> c
+if_ pred true false =
+    if pred then
+        true
+
+    else
+        false
+
+
+crudId : Crud -> { a | id : b } -> List { a | id : b } -> List { a | id : b }
+crudId =
+    crud (\a b -> a.id == b.id)
+
+
+crud : (a -> a -> Bool) -> Crud -> a -> List a -> List a
+crud compare action item list =
+    case action of
+        Add ->
+            item :: list
+
+        Update ->
+            list
+                |> List.map
+                    (\oldItem -> if_ (compare item oldItem) item oldItem)
+
+        Remove ->
+            list |> List.filter (\oldItem -> if_ (compare item oldItem) False True)
 
 
 
@@ -77,9 +120,10 @@ encodeMessage msg =
 projectEncoder : Project -> E.Value
 projectEncoder project =
     E.object
-        [ ( "id", E.string (Uuid.toString project.id) )
+        [ ( "id", Uuid.encode project.id )
         , ( "title", E.string project.title )
         , ( "description", E.string project.description )
+        , ( "todos", E.list todoEncoder <| project.todos )
         ]
 
 
@@ -89,10 +133,63 @@ projectDecoder =
         |> DP.required "id" Uuid.decoder
         |> DP.required "title" D.string
         |> DP.optional "description" D.string ""
+        |> DP.optional "todos" (D.list todoDecoder) []
 
 
-saveProjects : List Project -> Cmd msg
-saveProjects =
+todoEncoder : Todo -> E.Value
+todoEncoder todo =
+    E.object
+        [ ( "id", todo.id |> Uuid.encode )
+        , ( "title", todo.title |> E.string )
+        , ( "timesheet", todo.timesheet |> E.list timesheetEncoder )
+        ]
+
+
+timesheetEncoder : TimeSheet -> E.Value
+timesheetEncoder ts =
+    case ts of
+        ClockIn start ->
+            E.object [ ( "start", start |> E.int << Time.posixToMillis ) ]
+
+        ClockOut start end ->
+            E.object
+                [ ( "start", start |> E.int << Time.posixToMillis )
+                , ( "end", end |> E.int << Time.posixToMillis )
+                ]
+
+
+todoDecoder : D.Decoder Todo
+todoDecoder =
+    D.succeed Todo
+        |> DP.required "id" Uuid.decoder
+        |> DP.required "title" D.string
+        |> DP.optional "timesheet" (D.list timesheetDecoder) []
+
+
+type alias TimeSheetJson =
+    { start : Int
+    , end : Maybe Int
+    }
+
+
+timesheetDecoder : D.Decoder TimeSheet
+timesheetDecoder =
+    D.succeed TimeSheetJson
+        |> DP.required "start" D.int
+        |> DP.required "end" (D.nullable D.int)
+        |> D.andThen
+            (\result ->
+                case result.end of
+                    Just end ->
+                        D.succeed (ClockOut (Time.millisToPosix result.start) (Time.millisToPosix end))
+
+                    Nothing ->
+                        D.succeed (ClockIn (Time.millisToPosix result.start))
+            )
+
+
+cmdSaveProjects : List Project -> Cmd msg
+cmdSaveProjects =
     SaveProjects >> encodeMessage >> messageFromElm
 
 
@@ -107,6 +204,22 @@ type SendPortMessage
 type ReceivePortMessage
     = PortString String
     | UnhandledPortMessage String
+
+
+recvPortDecoders : List (D.Decoder ReceivePortMessage)
+recvPortDecoders =
+    [ D.succeed RecvMessage
+        |> DP.required "type" D.string
+        |> DP.required "payload" D.string
+        |> D.andThen
+            (\recv ->
+                if recv.type_ == "buttholes" then
+                    D.succeed <| PortString recv.payload
+
+                else
+                    D.fail "oops, not a butthole"
+            )
+    ]
 
 
 type alias RecvMessage =
@@ -192,7 +305,17 @@ type alias Project =
     { id : Uuid
     , title : String
     , description : String
+    , todos : List Todo
     }
+
+
+type alias Todo =
+    { id : Uuid, title : String, timesheet : List TimeSheet }
+
+
+type TimeSheet
+    = ClockIn Posix
+    | ClockOut Posix Posix
 
 
 type alias Model =
@@ -229,6 +352,45 @@ type Msg
     | EditProject Project
     | UpdateSelectedProject ProjectField
     | ShowModal KindOfModal
+    | AddNewTodo Project
+    | UpdateTodo Project TodoUpdate
+    | UpdateProject Project
+
+
+
+-- | UpdateProjectTodos Project (Todo TodoUpdate)
+
+
+updateProjects : List Project -> Project -> List Project
+updateProjects list project =
+    list
+        |> List.map
+            (\thisProj ->
+                if thisProj.id == project.id then
+                    project
+
+                else
+                    thisProj
+            )
+
+
+updateTodos : List Todo -> Todo -> List Todo
+updateTodos todos todo =
+    todos
+        |> List.map
+            (\thisTodo ->
+                if thisTodo.id == todo.id then
+                    todo
+
+                else
+                    thisTodo
+            )
+
+
+type TodoUpdate
+    = NewTodo Todo
+    | UpdatedTodo Todo
+    | DeletedTodo Todo
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -259,25 +421,30 @@ update msg model =
 
         AddNewProject ->
             let
+                id =
+                    makeUuid model.seed
+
+                title =
+                    "New Project"
+
+                description =
+                    ""
+
+                todos =
+                    []
+
                 projects =
-                    Project (makeUuid model.seed) "New Project" "" :: model.projects
+                    Project id title description todos :: model.projects
             in
             ( { model | projects = projects }
-            , Cmd.batch [ saveProjects projects, cmdGenerateNewSeed ]
+            , Cmd.batch [ cmdSaveProjects projects, cmdGenerateNewSeed ]
             )
 
         DeleteAllProjects ->
-            ( { model | projects = [], selectedProject = Nothing }, Cmd.batch [ saveProjects model.projects, sendFromElm SendHideModal ] )
+            ( { model | projects = [], selectedProject = Nothing }, Cmd.batch [ cmdSaveProjects model.projects, sendFromElm SendHideModal ] )
 
         EditProject project ->
-            ( { model
-                | selectedProject =
-                    if model.selectedProject == Just project then
-                        Nothing
-
-                    else
-                        Just project
-              }
+            ( { model | selectedProject = if_ (model.selectedProject /= Just project) (Just project) Nothing }
             , Cmd.none
             )
 
@@ -308,7 +475,38 @@ update msg model =
             in
             ( { model | projects = projects, selectedProject = selectedProject }
               -- , messageFromElm (encodeMessage (SaveProjects projects))
-            , saveProjects projects
+            , cmdSaveProjects projects
+            )
+
+        AddNewTodo project ->
+            let
+                id =
+                    makeUuid model.seed
+
+                newProject =
+                    { project | todos = Todo id "New Todo" [] :: project.todos }
+
+                newProjects =
+                    List.map
+                        (\thisProject ->
+                            if thisProject == project then
+                                newProject
+
+                            else
+                                thisProject
+                        )
+                    <|
+                        model.projects
+
+                newSelectedProject =
+                    if model.selectedProject == Just project then
+                        Just newProject
+
+                    else
+                        model.selectedProject
+            in
+            ( { model | projects = newProjects, selectedProject = newSelectedProject }
+            , Cmd.batch [ cmdSaveProjects newProjects, cmdGenerateNewSeed, Task.attempt (\_ -> Noop) (Dom.focus ("todo-title-" ++ Uuid.toString id)) ]
             )
 
         ShowModal kind ->
@@ -318,6 +516,53 @@ update msg model =
 
                 _ ->
                     ( { model | showModal = kind }, Cmd.none )
+
+        UpdateTodo project updatedTodo ->
+            let
+                newTodos =
+                    case updatedTodo of
+                        NewTodo todo ->
+                            crudId Add todo project.todos
+
+                        UpdatedTodo todo ->
+                            crudId Update todo project.todos
+
+                        DeletedTodo todo ->
+                            crudId Remove todo project.todos
+
+                newProjects =
+                    crudId Update { project | todos = newTodos } model.projects
+            in
+            ( { model | projects = newProjects }, cmdSaveProjects newProjects )
+
+        UpdateProject project ->
+            let
+                newProjects =
+                    updateProjects model.projects project
+            in
+            ( { model | projects = newProjects }, cmdSaveProjects newProjects )
+
+
+
+-- UpdateProjectTodos project updatedTodo ->
+--     let
+--         todos =
+--             project.todos
+--         newTodos =
+--             case updatedTodo of
+--                 NewTodo todo ->
+--                     List.map <|
+--                         \t ->
+--                             if t.id == todo.id then
+--                                 todo
+--                             else
+--                                 t
+--         -- newTodos =
+--         --     updateTodos project.todos todo
+--         newProjects =
+--             updateProjects model.projects { project | todos = newTodos }
+--     in
+--     ( { model | projects = newProjects }, cmdSaveProjects newProjects )
 
 
 subscriptions : Model -> Sub Msg
@@ -337,6 +582,62 @@ idToOnFocus =
 
 view : Model -> Document Msg
 view model =
+    { title = "Projects"
+    , body =
+        [ header []
+            [ nav []
+                [ div [ class "brand" ] [ text "Projects" ] ]
+            ]
+        , main_ []
+            [ div [] [ text "Showing editing project here" ]
+            , div [ class "projects-list" ]
+                [ h3 [] [ text "Projects" ]
+                , ul []
+                    (model.projects
+                        |> (List.map <|
+                                viewProjectCard
+                                    { elem = li
+                                    , editing = model.selectedProject
+                                    }
+                           )
+                    )
+                ]
+            ]
+        ]
+    }
+
+
+viewProjectCard :
+    { elem : List (Attribute Msg) -> List (Html Msg) -> Html Msg
+    , editing : Maybe Project
+    }
+    -> Project
+    -> Html Msg
+viewProjectCard { elem, editing } project =
+    let
+        isEditing =
+            Just project == editing
+    in
+    elem
+        [ class
+            ("project-list-card "
+                ++ if_ isEditing "active" ""
+            )
+        , onClick <| EditProject project
+        ]
+        [ h4 [] [ text project.title ]
+        , div [ class "next-todo", onClick Noop ]
+            [ div []
+                [ div [ class "up-next" ] [ text "Next up..." ]
+                , div [] [ text "Do something new" ]
+                ]
+            , button [ class "fa fa-lg fa-fw fa-arrow-circle-right" ] []
+            ]
+        ]
+
+
+viewOriginal : Model -> Document Msg
+viewOriginal model =
     { title = "Tasks.TimothyPew_com"
     , body =
         [ dialog
@@ -365,34 +666,16 @@ view model =
             [ button [ onClick AddNewProject ] [ text "+ New Project" ]
             , button [ onClick (ShowModal DeleteAllProjectsModal) ] [ text "Delete All Projects" ]
             ]
-        , case model.selectedProject of
-            Just proj ->
-                div [ class "project-editor" ]
-                    [ input
-                        [ value proj.title
-                        , onInput <| ProjectTitle >> UpdateSelectedProject
-                        , id ("title-" ++ Uuid.toString proj.id)
-                        , idToOnFocus ("title-" ++ Uuid.toString proj.id)
-                        ]
-                        []
-                    , textarea
-                        [ value proj.description
-                        , onInput <| ProjectDescription >> UpdateSelectedProject
-                        ]
-                        []
-                    ]
-
-            Nothing ->
-                text ""
         , ul [ class "projects-list" ]
             (List.map
                 (\project ->
                     let
-                        className =
-                            if model.selectedProject == Just project then
-                                "selected"
+                        isEditing =
+                            model.selectedProject == Just project
 
-                            else
+                        className =
+                            if_ (model.selectedProject == Just project)
+                                "selected"
                                 ""
 
                         title =
@@ -408,12 +691,47 @@ view model =
                                 |> String.split "\n"
                                 >> List.map (\line -> p [] [ text line ])
 
+                        viewTodo todo =
+                            div [ class "todo" ]
+                                [ input
+                                    [ id <| "todo-title-" ++ Uuid.toString todo.id
+
+                                    -- , autofocus True
+                                    , class "todo-title"
+                                    , value todo.title
+                                    , onFocus (Send <| FocusInputById <| "todo-title-" ++ Uuid.toString todo.id)
+                                    , onInput (\newTitle -> UpdateTodo project (UpdatedTodo { todo | title = newTitle }))
+                                    ]
+                                    []
+                                , button [ onClick <| UpdateTodo project <| DeletedTodo todo ] [ text "Delete!!!" ]
+                                ]
+
+                        viewTodos =
+                            div [] <|
+                                button [ onClick (AddNewTodo project) ] [ text "Add todo" ]
+                                    :: (project.todos
+                                            |> List.map
+                                                viewTodo
+                                       )
+
                         cardFooter =
                             div [] [ text <| Uuid.toString project.id ]
                     in
-                    li [ onClick (EditProject project), class className ]
-                        [ h3 [] [ text title ]
+                    li [ class className ]
+                        [ nav []
+                            [ h3 [] [ text title, FA.icon FA.trash ]
+                            , div [ class "controls" ]
+                                [ button
+                                    [ onClick <| EditProject project
+                                    , class <| "fa " ++ if_ isEditing "fa-window-close-o" "fa-edit"
+                                    ]
+                                    []
+                                ]
+                            , FA.icon FA.trash
+                            , i [ class "fa fa-edit" ] []
+                            ]
                         , pre [] description
+                        , viewTodos
                         , cardFooter
                         ]
                 )
@@ -433,12 +751,6 @@ init flags =
         { seed, projects } =
             Result.withDefault { seed = 666, projects = [] }
                 (D.decodeValue flagsDecoder flags)
-
-        -- newSeed =
-        --     D.decodeValue flagsDecoder flags
-        --         |> Result.map (\{ seed } -> seed)
-        --         |> Result.withDefault 666
-        --         |> Random.initialSeed
       in
       { seed = Random.initialSeed seed
       , time =

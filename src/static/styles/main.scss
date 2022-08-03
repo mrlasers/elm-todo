@@ -15,8 +15,129 @@ body {
   flex-direction: column;
 }
 
+header {
+  background-color: coral;
+
+  nav {
+    margin-inline: auto;
+    max-width: 800px;
+    padding: 1.5rem;
+
+    .brand {
+      font-size: 2rem;
+    }
+  }
+}
+
+main {
+  margin-inline: auto;
+  width: 800px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.projects-list {
+  h3 {
+    margin-top: 0;
+  }
+
+  ul {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+.project-list-card {
+  --bg-color: white;
+  --fg-color: black;
+
+  display: flex;
+  flex-direction: column;
+  gap: 1em;
+
+  margin: 0;
+  padding: 0.45em;
+
+  background-color: var(--bg-color);
+  color: var(--fg-color);
+
+  border: 0.2rem solid;
+  box-shadow: 0.5rem 0.75rem 0 black;
+
+  &.active {
+    --bg-color: #dfdfdf;
+    border-left-color: var(--bg-color);
+
+    &:first-child {
+      border-top-left-radius: 0;
+    }
+
+    &:last-child {
+      border-bottom-left-radius: 0;
+    }
+  }
+
+  &:first-child {
+    border-top-left-radius: 0.75em;
+    border-top-right-radius: 0.75em;
+  }
+  &:last-child {
+    border-bottom-left-radius: 0.75em;
+    border-bottom-right-radius: 0.75em;
+  }
+
+  h4 {
+    font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+    font-size: 1.25rem;
+    margin-block: 0;
+
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .next-todo {
+    display: flex;
+    justify-content: space-between;
+    background-color: darkgrey;
+    color: white;
+    padding: 0.25em 0.5em;
+    border-radius: 0.35em;
+    cursor: pointer;
+
+    &:hover {
+      background-color: grey;
+      button {
+        color: yellowgreen;
+      }
+    }
+
+    &:active {
+      background-color: yellowgreen;
+      button {
+        color: white;
+      }
+    }
+
+    .up-next {
+      font-size: 80%;
+      margin-bottom: 0.5em;
+      color: #fafafa;
+    }
+
+    button {
+      border: 0;
+      background: inherit;
+      color: white;
+      cursor: inherit;
+    }
+  }
+}
+
 .selected {
   background-color: lightgrey;
+  background: coral;
   // color: grey;
 }
 
@@ -44,6 +165,24 @@ body {
   textarea {
     height: 8em;
     // width: 100%;
+  }
+}
+
+.todo {
+  border: 1px solid;
+  padding: 1em;
+
+  h4 {
+    margin: 0;
+  }
+
+  .todo-title {
+    border: 0;
+    background-color: inherit;
+
+    &:focus {
+      outline: 2px solid yellowgreen;
+    }
   }
 }
 

@@ -24,6 +24,7 @@ app.ports.messageFromElm.subscribe((msg) => {
       return
     case 'focus-element':
       document.getElementById(payload)?.select()
+      console.log('focus-element', payload)
       return
     case 'save-todos':
       localStorage.setItem('todos', JSON.stringify(payload))
