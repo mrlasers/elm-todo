@@ -651,7 +651,7 @@ viewProjectEditor : Project -> Html msg
 viewProjectEditor project =
     div [ class "project-editor" ]
         [ h2 [] [ text project.title ]
-        , div [] [ p [] [ text project.description ] ]
+        , div [] [ p [] [ text project.description  ] ]
         ]
 
 
