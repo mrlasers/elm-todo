@@ -46,11 +46,15 @@ const devConfig = {
       },
     ],
   },
+  output: {
+    publicPath: '/', // this needed for multi-segment fallback
+  },
   devServer: {
     static: {
       directory: Path.resolve(__dirname, 'dist'),
     },
     hot: true,
+    historyApiFallback: true,
   },
 }
 
